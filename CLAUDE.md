@@ -108,3 +108,51 @@ clean:
 ```
 
 **Note**: This pattern is suitable for simple sketches. Complex applications with libraries and shared code will require adapted build systems.
+
+## Finite State Machine (FSM) Design Guidelines
+
+### FSM Implementation Principles
+When implementing finite state machines in Arduino applications, follow these established patterns:
+
+#### State Responsibility
+- Each state should have a single, well-defined responsibility
+- Announcement states handle messages and timing delays only
+- Action states perform the actual work (LED control, sensor reading, etc.)
+- Avoid mixing state responsibilities to maintain clean separation
+
+#### State Transitions
+- Use `advanceToNextPhase()` function for consistent state transitions
+- Initialize `phaseStep = -1` to ensure first iteration (index 0) executes properly
+- Reset timing and flags consistently on each transition
+- Maintain `phaseElapsed = currentTime - phaseStartTime` for phase-relative timing
+
+#### Moore vs Mealy FSM Patterns
+- **Prefer Moore FSM**: Outputs depend only on current state, easier to debug and maintain
+- **Avoid Mealy FSM**: Outputs depend on state + inputs, creates coupling between states
+- Never implement functionality of one state within another state
+
+#### State Machine Structure
+```cpp
+enum TestPhase {
+  PHASE_ANNOUNCE_X,     // Announcement and preparation
+  PHASE_EXECUTE_X,      // Actual work execution  
+  PHASE_ANNOUNCE_Y,     // Next announcement
+  PHASE_EXECUTE_Y,      // Next work execution
+  PHASE_COMPLETE        // Final state
+};
+
+void advanceToNextPhase(TestPhase nextPhase) {
+  currentPhase = nextPhase;
+  phaseStartTime = millis();
+  phaseStep = -1;  // Ensures first iteration (index 0) executes
+  phaseMessageSent = false;
+}
+```
+
+#### Common FSM Anti-Patterns to Avoid
+- **Cross-state coupling**: Implementing work logic in announcement states
+- **Initialization errors**: Starting `phaseStep` at 0 when first index is 0
+- **Timing chain breaks**: Not resetting `phaseStartTime` properly on transitions
+- **State order dependencies**: Creating hidden dependencies between state order
+
+These patterns ensure maintainable, debuggable state machines suitable for complex flight control and navigation systems.
