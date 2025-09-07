@@ -51,3 +51,60 @@ Serial.println(F("[INFO] System ready"));
 ```
 
 This ensures maximum compatibility across different display devices and maintains professional, readable output formatting.
+
+## Arduino Build System Guidelines
+
+### Simple Arduino Sketch Build Pattern
+For single-file Arduino sketches (like device tests and simple applications), use this standardized build approach:
+
+#### Makefile Structure
+- Place Makefile in each sketch directory alongside the .ino file
+- Use file dependencies to avoid unnecessary recompilation
+- Standard targets: `all`/`compile`, `upload`, `clean`
+- Windows-compatible commands in clean target
+
+#### Environment Variables
+- Use `ARDUINO_PORT` environment variable for upload/monitor operations
+- Let arduino-cli fail gracefully if environment variable not set
+- No error checking or fallback logic in Makefiles
+
+#### Serial Monitoring
+- Use `monitor.bat` in project root for serial monitoring
+- Accept COM port as command line argument or from `ARDUINO_PORT`
+- Hard-coded 9600 baud rate (revisit for complex applications)
+
+#### Example Makefile Template
+```makefile
+# Arduino configuration
+BOARD = adafruit:samd:adafruit_qtpy_m0
+BAUD = 9600
+
+# Project files
+SKETCH = [SketchName].ino
+
+# Build directory
+BUILD_DIR = build
+
+# Default target
+all: compile
+
+# Compile the sketch
+compile: $(BUILD_DIR)/$(SKETCH).bin
+
+$(BUILD_DIR)/$(SKETCH).bin: $(SKETCH)
+	arduino-cli compile --fqbn $(BOARD) --output-dir $(BUILD_DIR) $(SKETCH)
+
+# Upload to board
+upload: $(BUILD_DIR)/$(SKETCH).bin
+	arduino-cli upload --fqbn $(BOARD) --port $(ARDUINO_PORT) --input-dir $(BUILD_DIR) $(SKETCH)
+
+# Clean build artifacts (Windows-compatible)
+clean:
+	if exist $(BUILD_DIR) rmdir /s /q $(BUILD_DIR)
+	if exist *.hex del *.hex
+	if exist *.elf del *.elf
+
+.PHONY: all compile upload clean
+```
+
+**Note**: This pattern is suitable for simple sketches. Complex applications with libraries and shared code will require adapted build systems.

@@ -351,16 +351,84 @@ Standard Arduino development workflow:
 5. **Upload** (Ctrl+U): Compile and flash to device
 
 ### Arduino CLI Build Process
-Each application includes a `Makefile` for command-line builds using Arduino CLI.
 
-#### Application Makefile Structure
+#### Simple Applications (Single .ino files)
+Simple Arduino sketches use a standardized build pattern with Makefiles located in each sketch directory:
+
 ```makefile
-# Application-specific Makefile
+# Simple Arduino sketch Makefile template
+# Located in: applications/[app_name]/Makefile
+
+# Arduino configuration
+BOARD = adafruit:samd:adafruit_qtpy_m0
+BAUD = 9600
+
+# Project files
+SKETCH = [SketchName].ino
+
+# Build directory
+BUILD_DIR = build
+
+# Default target
+all: compile
+
+# Compile the sketch
+compile: $(BUILD_DIR)/$(SKETCH).bin
+
+$(BUILD_DIR)/$(SKETCH).bin: $(SKETCH)
+	arduino-cli compile --fqbn $(BOARD) --output-dir $(BUILD_DIR) $(SKETCH)
+
+# Upload to board
+upload: $(BUILD_DIR)/$(SKETCH).bin
+	arduino-cli upload --fqbn $(BOARD) --port $(ARDUINO_PORT) --input-dir $(BUILD_DIR) $(SKETCH)
+
+# Clean build artifacts (Windows-compatible)
+clean:
+	if exist $(BUILD_DIR) rmdir /s /q $(BUILD_DIR)
+	if exist *.hex del *.hex
+	if exist *.elf del *.elf
+
+.PHONY: all compile upload clean
+```
+
+**Key Features:**
+- File dependency checking prevents unnecessary recompilation
+- Uses `ARDUINO_PORT` environment variable for uploads
+- Windows-compatible clean commands
+- Located in sketch directory alongside .ino file
+
+#### Serial Monitoring
+Serial monitoring uses a batch file in the project root (`monitor.bat`):
+
+```batch
+@echo off
+setlocal
+
+if "%1"=="" (
+    if "%ARDUINO_PORT%"=="" (
+        echo Error: No COM port specified. Either set ARDUINO_PORT environment variable or pass port as argument.
+        echo Usage: monitor.bat [COM_PORT]
+        echo Example: monitor.bat COM4
+        exit /b 1
+    )
+    set PORT=%ARDUINO_PORT%
+) else (
+    set PORT=%1
+)
+
+echo Starting serial monitor on %PORT% at 9600 baud...
+arduino-cli monitor --port %PORT% --config baudrate=9600
+```
+
+#### Complex Applications (Future)
+Complex applications with libraries and shared code will use an extended Makefile structure:
+
+```makefile
+# Complex application Makefile template (Future use)
 # Located in: applications/[app_name]/Makefile
 
 # Configuration
 BOARD_FQBN = adafruit:samd:adafruit_qtpy_m0
-PORT = /dev/ttyACM0
 SKETCH = $(shell basename $(CURDIR)).ino
 
 # Shared library paths
@@ -374,17 +442,16 @@ BUILD_DIR = build
 # Default target
 all: compile
 
-# Compile sketch
+# Compile sketch with library paths
 compile:
-	arduino-cli compile --fqbn $(BOARD_FQBN) --build-path $(BUILD_DIR) .
+	arduino-cli compile --fqbn $(BOARD_FQBN) --build-path $(BUILD_DIR) \
+		--library $(SHARED_HARDWARE) \
+		--library $(SHARED_UTILITIES) \
+		--library $(SHARED_WRAPPERS) .
 
 # Upload to device
 upload: compile
-	arduino-cli upload --fqbn $(BOARD_FQBN) --port $(PORT) --input-dir $(BUILD_DIR)
-
-# Clean build artifacts
-clean:
-	rm -rf $(BUILD_DIR)
+	arduino-cli upload --fqbn $(BOARD_FQBN) --port $(ARDUINO_PORT) --input-dir $(BUILD_DIR)
 
 # Install required libraries
 install-deps:
@@ -392,16 +459,7 @@ install-deps:
 	arduino-cli lib install "FlashStorage"
 	arduino-cli lib install "Servo"
 
-# Show memory usage
-memory: compile
-	@echo "Memory usage:"
-	@arduino-cli compile --fqbn $(BOARD_FQBN) --build-path $(BUILD_DIR) . --verbose | grep "Sketch uses"
-
-# Serial monitor
-monitor:
-	arduino-cli monitor --port $(PORT) --config baudrate=9600
-
-.PHONY: all compile upload clean install-deps memory monitor
+.PHONY: all compile upload install-deps
 ```
 
 #### Root Makefile
