@@ -1,0 +1,58 @@
+# Arduino IDE generated files
+*.hex
+*.elf
+*.bin
+*.map
+
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+
+# Arduino IDE specific
+.arduino15/
+libraries/
+hardware/
+
+# Platform specific
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+*.swp
+*~
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-*
+*.code-workspace
+
+# Documentation build artifacts
+docs/_build/
+docs/.doctrees/
+
+# Test artifacts
+test_results/
+coverage/
+
+# Temporary files
+temp/
+tmp/
+*.log
+extras/
+
+# Hardware design files (optional - keep source, ignore outputs)
+hardware/**/*.brd.backup
+hardware/**/*.sch.backup
+hardware/**/gerbers/
+hardware/**/drill/
+hardware/**/pick_place/
+
+# Keep important hardware files
+!hardware/**/*.kicad_sch
+!hardware/**/*.kicad_pcb
+!hardware/**/*.kicad_pro
+!hardware/**/*.png
+!hardware/**/*.pdf

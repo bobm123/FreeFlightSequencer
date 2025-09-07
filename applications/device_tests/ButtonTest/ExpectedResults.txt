@@ -1,0 +1,29 @@
+[INFO] Button Test Starting
+[INFO] Press button for short and long presses
+[INFO] Test will run for 30 seconds
+
+[OK] Button pressed at 5808ms
+[OK] Button released at 5932ms (Duration: 124ms - SHORT)
+[OK] Button pressed at 9941ms
+[OK] Button released at 15892ms (Duration: 5951ms - LONG)
+[OK] Button pressed at 19220ms
+[OK] Button released at 19391ms (Duration: 171ms - SHORT)
+[OK] Button pressed at 19518ms
+[OK] Button released at 19632ms (Duration: 114ms - SHORT)
+[OK] Button pressed at 19733ms
+[OK] Button released at 19820ms (Duration: 87ms - SHORT)
+[WARN] Rapid button presses detected - debouncing working
+[OK] Button pressed at 19923ms
+[OK] Button released at 20017ms (Duration: 94ms - SHORT)
+[WARN] Rapid button presses detected - debouncing working
+[OK] Button pressed at 20115ms
+[OK] Button released at 20199ms (Duration: 84ms - SHORT)
+[WARN] Rapid button presses detected - debouncing working
+[OK] Button pressed at 20303ms
+[OK] Button released at 20406ms (Duration: 103ms - SHORT)
+[OK] Button pressed at 20483ms
+[OK] Button released at 20607ms (Duration: 124ms - SHORT)
+
+[INFO] Button Test Complete - PASS
+[INFO] Events detected: 9 presses (8 short, 1 long)
+[INFO] Debouncing: No spurious events detected
