@@ -114,6 +114,38 @@ clean:
 
 **Note**: This pattern is suitable for simple sketches. Complex applications with libraries and shared code will require adapted build systems.
 
+### Test Application Structure
+When creating device test applications, follow this standardized structure:
+
+#### Required Files
+All test applications must include these four files:
+```
+applications/DeviceTests/<TestName>/
+├── <TestName>.ino           # Main test sketch
+├── <TestName>Spec.md        # Test specification with objectives and pass criteria
+├── Makefile                 # Arduino build system (using template above)
+└── ExpectedResults.txt      # Sample output showing expected serial messages
+```
+
+#### Test Specification Guidelines
+The `<TestName>Spec.md` file should include:
+- **Overview**: Brief description of test purpose
+- **Hardware Requirements**: Required components and connections
+- **Test Objectives**: What functionality is being validated
+- **Test Sequence**: Step-by-step test phases
+- **Expected Behavior**: What should happen during successful test
+- **Pass Criteria**: Specific requirements for test success
+- **Failure Modes**: Common issues and troubleshooting
+
+#### Expected Results Format
+The `ExpectedResults.txt` file should contain:
+- Sample serial output from successful test run
+- Key messages showing test progression
+- Timing information where relevant
+- Statistical summaries and completion messages
+
+This standardized structure ensures consistent documentation, build capability, and validation reference for all device test applications.
+
 ## Finite State Machine (FSM) Design Guidelines
 
 ### FSM Implementation Principles
@@ -135,6 +167,12 @@ When implementing finite state machines in Arduino applications, follow these es
 - **Prefer Moore FSM**: Outputs depend only on current state, easier to debug and maintain
 - **Avoid Mealy FSM**: Outputs depend on state + inputs, creates coupling between states
 - Never implement functionality of one state within another state
+
+#### Variable Initialization Principles
+- **Always initialize to legal values**: Never use "magic" illegal values (-1, 255, etc.) expecting other code to fix them
+- **Explicit state management**: If you need "not set" state, use explicit flags or enums, not out-of-range values
+- **Defensive programming**: All variables should hold valid values at all times to prevent hard-to-debug failures
+- **Flight-critical systems**: Invalid states can cause catastrophic failures in control systems
 
 #### State Machine Structure
 ```cpp
