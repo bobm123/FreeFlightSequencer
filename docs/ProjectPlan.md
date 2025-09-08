@@ -148,10 +148,10 @@ The directory structure promotes code reuse, modular development, and clear sepa
 ```
 ProjectRoot/
 ├── applications/                     # Individual Arduino applications
-│   ├── led_button/                  # Phase 1: LED and Button app
-│   ├── device_tests/                # Phase 2: Device test suite
-│   ├── flight_sequencer/            # Phase 3: Flight sequencer
-│   ├── gps_autopilot/               # Phase 4: GPS autopilot
+│   ├── LedButton/                   # Phase 1: LED and Button app
+│   ├── DeviceTests/                 # Phase 2: Device test suite
+│   ├── FlightSequencer/             # Phase 3: Flight sequencer
+│   ├── GpsAutopilot/                # Phase 4: GPS autopilot
 │   └── examples/                    # Simple example applications
 ├── lib/                             # Original C code libraries (unchanged)
 │   ├── module1/                     # Software modules from original project
@@ -467,7 +467,7 @@ install-deps:
 # Root project Makefile
 # Builds all applications
 
-APPLICATIONS = led_button device_tests flight_sequencer gps_autopilot
+APPLICATIONS = LedButton DeviceTests FlightSequencer GpsAutopilot
 
 # Build all applications
 all:
@@ -533,7 +533,7 @@ arduino-cli lib install "Servo"
 ```bash
 # Example development workflow
 git checkout -b feature/button-debounce
-cd applications/led_button
+cd applications/LedButton
 make compile                    # Test build
 make upload                     # Flash to device
 make monitor                    # Test functionality

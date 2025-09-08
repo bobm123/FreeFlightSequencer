@@ -1,0 +1,38 @@
+[INFO] LED Button Application Starting
+[INFO] Short press: Cycle colors | Long press: Adjust brightness
+[INFO] Auto-return to idle after 30.0s of inactivity
+
+[INFO] Entering IDLE mode
+[OK] Button pressed at 8.3s (currentState=0)
+[OK] Button released at 8.4s (Duration: 142)
+[INFO] Entering COLOR_CYCLE mode
+[OK] Button pressed at 9.5s (currentState=1)
+[OK] Button released at 9.6s (Duration: 164)
+[OK] Color changed to GREEN at 9.6s
+[OK] Button pressed at 10.5s (currentState=1)
+[OK] Button released at 10.7s (Duration: 164)
+[OK] Color changed to BLUE at 10.7s
+[OK] Button pressed at 11.7s (currentState=1)
+[OK] Button released at 11.9s (Duration: 152)
+[OK] Color changed to RED at 11.9s
+[OK] Button pressed at 13.7s (currentState=1)
+[OK] Long press detected at 14.7s
+[INFO] Entering BRIGHTNESS_ADJUST mode
+[OK] Brightness adjusted to 64 (25%) at 14.7s
+[OK] Brightness adjusted to 128 (50%) at 15.0s
+[OK] Brightness adjusted to 192 (75%) at 15.3s
+[OK] Brightness adjusted to 255 (100%) at 15.6s
+[OK] Brightness adjusted to 64 (25%) at 15.9s
+[OK] Brightness adjusted to 128 (50%) at 16.2s
+[OK] Brightness adjusted to 192 (75%) at 16.5s
+[OK] Brightness adjusted to 255 (100%) at 16.8s
+[OK] Brightness adjusted to 64 (25%) at 17.1s
+[OK] Brightness adjusted to 128 (50%) at 17.4s
+[OK] Brightness adjusted to 192 (75%) at 17.7s
+[OK] Button released at 17.9s (Duration: 4259)
+[INFO] Entering COLOR_CYCLE mode
+[OK] Button pressed at 18.6s (currentState=1)
+[OK] Button released at 18.7s (Duration: 78)
+[OK] Color changed to GREEN at 18.7s
+[INFO] Auto-return to idle after 30.0s of inactivity
+[INFO] Entering IDLE mode

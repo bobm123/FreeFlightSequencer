@@ -90,7 +90,7 @@ Comprehensive testing application that validates all connected hardware devices 
 - Servo and ESC hardware for testing
 
 ## Deliverables
-- Comprehensive test suite application (device_tests.ino)
+- Comprehensive test suite application (DeviceTests.ino)
 - Extended HAL components (hal_gps.h/cpp, hal_servo.h/cpp, hal_esc.h/cpp)
 - Shared test framework components
 - Test documentation and usage instructions

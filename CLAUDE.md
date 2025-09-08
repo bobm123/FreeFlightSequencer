@@ -61,7 +61,7 @@ For single-file Arduino sketches (like device tests and simple applications), us
 - Place Makefile in each sketch directory alongside the .ino file
 - Use file dependencies to avoid unnecessary recompilation
 - Standard targets: `all`/`compile`, `upload`, `clean`
-- Windows-compatible commands in clean target
+- Cross-platform compatible commands in clean target
 
 #### Environment Variables
 - Use `ARDUINO_PORT` environment variable for upload/monitor operations
@@ -98,14 +98,19 @@ $(BUILD_DIR)/$(SKETCH).bin: $(SKETCH)
 upload: $(BUILD_DIR)/$(SKETCH).bin
 	arduino-cli upload --fqbn $(BOARD) --port $(ARDUINO_PORT) --input-dir $(BUILD_DIR) $(SKETCH)
 
-# Clean build artifacts (Windows-compatible)
+# Clean build artifacts
 clean:
-	if exist $(BUILD_DIR) rmdir /s /q $(BUILD_DIR)
-	if exist *.hex del *.hex
-	if exist *.elf del *.elf
+	rm -rf $(BUILD_DIR)
+	rm -f *.hex *.elf
 
 .PHONY: all compile upload clean
 ```
+
+#### Build System Design Principles
+- **Simplicity over complexity**: Use standard Unix commands (`rm -rf`, `rm -f`) instead of platform-specific conditionals
+- **Cross-platform compatibility**: Avoid Windows batch syntax (`if exist`, `rmdir /s /q`) in favor of bash-compatible commands
+- **Fail-safe operations**: Commands like `rm -f` handle missing files gracefully without errors
+- **Consistent behavior**: Same Makefile works across different development environments
 
 **Note**: This pattern is suitable for simple sketches. Complex applications with libraries and shared code will require adapted build systems.
 

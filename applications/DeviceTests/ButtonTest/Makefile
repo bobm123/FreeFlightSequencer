@@ -1,4 +1,4 @@
-# Makefile for LedTest Arduino project
+# Makefile for ButtonTest Arduino project
 # Target: Adafruit QT Py SAMD21
 
 # Arduino configuration
@@ -6,7 +6,7 @@ BOARD = adafruit:samd:adafruit_qtpy_m0
 BAUD = 9600
 
 # Project files
-SKETCH = LedTest.ino
+SKETCH = ButtonTest.ino
 
 # Build directory
 BUILD_DIR = build
@@ -24,10 +24,10 @@ $(BUILD_DIR)/$(SKETCH).bin: $(SKETCH)
 upload: $(BUILD_DIR)/$(SKETCH).bin
 	arduino-cli upload --fqbn $(BOARD) --port $(ARDUINO_PORT) --input-dir $(BUILD_DIR) $(SKETCH)
 
+
 # Clean build artifacts
 clean:
-	if exist $(BUILD_DIR) rmdir /s /q $(BUILD_DIR)
-	if exist *.hex del *.hex
-	if exist *.elf del *.elf
+	rm -rf $(BUILD_DIR)
+	rm -f *.hex *.elf
 
 .PHONY: all compile upload clean
