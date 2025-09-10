@@ -288,7 +288,7 @@ void resetStateVariables() {
   runStateEntered = false;
   dtDeployed = false;
   
-  Serial.println(F("[DEBUG] State variables reset for new flight"));
+  // Serial.println(F("[DEBUG] State variables reset for new flight"));
 }
 
 void executeMotorSpoolState() {
@@ -335,7 +335,7 @@ void executeMotorRunState() {
   motorServo.writeMicroseconds(MOTOR_SPEED * 10);
   
   if (!runStateEntered) {
-    Serial.println(F("[DEBUG] Entered Motor Run State"));
+    // Serial.println(F("[DEBUG] Entered Motor Run State"));
     runStateEntered = true;
   }
   
