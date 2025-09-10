@@ -16,10 +16,10 @@
 - [x] ~~Remove all EEPROM code and use hardcoded parameters~~ *(completed)*
 - [x] ~~Create Makefile for FlightSequencer QtPY build system~~ *(completed)*
 
-### Phase 1 Testing
+### Phase 1 Testing ✅ ALL COMPLETE
 - [x] ~~Test 1.1: Basic flight sequence operation~~ *(completed - validated complete flight sequence)*
-- [ ] Test 1.2: Reset and run sequence again
-- [ ] Test 1.3: Emergency cutoff from all states
+- [x] ~~Test 1.2: Reset and run sequence again~~ *(completed - fixed static variable reset bug)*
+- [x] ~~Test 1.3: Emergency cutoff from all states~~ *(completed - validated emergency cutoff in states 3, 4, 5)*
 
 ### Hardcoded Parameters (Phase 1)
 - **Motor Run Time**: 10 seconds *(debug timing, was 20)*
@@ -35,6 +35,7 @@
 ### State Machine Simplification
 - Remove programming states 95-98 (dual-button parameter adjustment)
 - Keep core flight states: Ready(1) → Armed(2) → Motor Spool(3) → Motor Run(4) → Glide(5) → DT Deploy(6) → Landing(99)
+- Emergency cutoff available in states 3, 4, and 5 (active flight phases)
 
 ## Phase 2: Parameter Programming (Future)
 *Deferred tasks:*
@@ -44,10 +45,10 @@
 - Implement parameter adjustment, storage, recall, and reset via PC serial interface
 
 ## Key Flight Sequence
-1. **Ready**: Heartbeat LED pattern, wait for button press
-2. **Armed**: Fast LED flash, release button to start
-3. **Motor Spool**: LED on, ramp motor to speed
-4. **Motor Run**: LED on, motor at full speed for 20 seconds
-5. **Glide**: LED slow blink, motor off, wait for 2 minutes total
-6. **DT Deploy**: Deploy dethermalizer servo
-7. **Landing**: Slow blink, hold button 3+ seconds to reset
+1. **Ready**: Heartbeat LED pattern, wait for long button press
+2. **Armed**: Fast LED flash, short press to launch
+3. **Motor Spool**: LED on, ramp motor to speed *(Emergency: Button press → Landing)*
+4. **Motor Run**: LED on, motor at full speed for 10 seconds *(Emergency: Button press → Landing)*
+5. **Glide**: LED slow blink, motor off, wait for 30 seconds total *(Emergency: Button press → Landing, skip DT)*
+6. **DT Deploy**: Deploy dethermalizer servo *(No emergency cutoff)*
+7. **Landing**: Slow blink, long press to reset

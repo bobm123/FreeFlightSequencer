@@ -156,8 +156,8 @@ void initializeSystem() {
   lastButtonState = digitalRead(BUTTON_PIN);
   lastDebounceTime = millis();
   
-  Serial.print(F("[DEBUG] Button pin initial state: "));
-  Serial.println(lastButtonState);
+  // Serial.print(F("[DEBUG] Button pin initial state: "));
+  // Serial.println(lastButtonState);
   
   // Initialize servos
   dtServo.attach(DT_SERVO_PIN);
@@ -279,12 +279,14 @@ void executeArmedState() {
 bool spoolComplete = false;
 bool spoolStateEntered = false;
 bool runStateEntered = false;
+bool dtDeployed = false;
 
 void resetStateVariables() {
   // Reset all state-specific variables for new flight
   spoolComplete = false;
   spoolStateEntered = false;
   runStateEntered = false;
+  dtDeployed = false;
   
   Serial.println(F("[DEBUG] State variables reset for new flight"));
 }
@@ -294,8 +296,17 @@ void executeMotorSpoolState() {
   setLedRed();
   
   if (!spoolStateEntered) {
-    Serial.println(F("[DEBUG] Entered Motor Spool State"));
+    // Serial.println(F("[DEBUG] Entered Motor Spool State"));
     spoolStateEntered = true;
+  }
+  
+  // Check for emergency shutoff during spool
+  if (buttonJustPressed) {
+    motorServo.writeMicroseconds(MIN_SPEED * 10);
+    Serial.println(F("[WARN] Emergency motor shutoff during spool!"));
+    flightState = 99;
+    buttonJustPressed = false;
+    return;
   }
   
   if (!spoolComplete) {
@@ -367,6 +378,14 @@ void executeGlideState() {
   // Ensure motor stays idle
   motorServo.writeMicroseconds(MIN_SPEED * 10);
   
+  // Check for emergency cutoff during glide (abort flight, no DT deployment)
+  if (buttonJustPressed) {
+    Serial.println(F("[WARN] Flight aborted during glide phase!"));
+    flightState = 99;
+    buttonJustPressed = false;
+    return;
+  }
+  
   unsigned long elapsed = millis() - startTime;
   
   // Check for total flight time completion
@@ -377,7 +396,6 @@ void executeGlideState() {
 }
 
 void executeDTDeployState() {
-  static bool deployed = false;
   static unsigned long deployTime = 0;
   
   // LED on during deployment
@@ -386,12 +404,12 @@ void executeDTDeployState() {
   // Ensure motor stays idle
   motorServo.writeMicroseconds(MIN_SPEED * 10);
   
-  if (!deployed) {
+  if (!dtDeployed) {
     // Deploy dethermalizer
     dtServo.writeMicroseconds(DT_DEPLOY);
     Serial.println(F("[INFO] Dethermalizer DEPLOYED"));
     deployTime = millis();
-    deployed = true;
+    dtDeployed = true;
   } else if (millis() - deployTime >= 2000) {
     // Hold deployment for 2 seconds, then retract
     dtServo.writeMicroseconds(DT_RETRACT);
@@ -432,15 +450,15 @@ void executeLandingState() {
 void updateButtonState() {
   bool currentState = digitalRead(BUTTON_PIN);
   
-  // Simple debug output every few seconds to show current pin state and system state
-  static unsigned long lastDebugTime = 0;
-  if (millis() - lastDebugTime > 5000) {
-    Serial.print(F("[DEBUG] Pin: "));
-    Serial.print(currentState);
-    Serial.print(F(", State: "));
-    Serial.println(flightState);
-    lastDebugTime = millis();
-  }
+  // Debug output disabled for production
+  // static unsigned long lastDebugTime = 0;
+  // if (millis() - lastDebugTime > 5000) {
+  //   Serial.print(F("[DEBUG] Pin: "));
+  //   Serial.print(currentState);
+  //   Serial.print(F(", State: "));
+  //   Serial.println(flightState);
+  //   lastDebugTime = millis();
+  // }
   
   // Debounce button state
   static bool lastStableState = HIGH;
@@ -448,10 +466,11 @@ void updateButtonState() {
   
   if (currentState != lastStableState) {
     if (millis() - lastChangeTime > DEBOUNCE_DELAY) {
-      Serial.print(F("[DEBUG] Button change detected: "));
-      Serial.print(lastStableState);
-      Serial.print(F(" -> "));
-      Serial.println(currentState);
+      // Debug output disabled for production
+      // Serial.print(F("[DEBUG] Button change detected: "));
+      // Serial.print(lastStableState);
+      // Serial.print(F(" -> "));
+      // Serial.println(currentState);
       lastStableState = currentState;
       lastChangeTime = millis();
     }
@@ -465,7 +484,7 @@ void updateButtonState() {
     // Button just pressed
     buttonJustPressed = true;
     buttonPressStartTime = millis();
-    Serial.println(F("[DEBUG] Button press started"));
+    // Serial.println(F("[DEBUG] Button press started"));
   }
   
   // Detect release events  
@@ -474,16 +493,16 @@ void updateButtonState() {
     buttonJustReleased = true;
     unsigned long pressDuration = millis() - buttonPressStartTime;
     
-    Serial.print(F("[DEBUG] Button released after "));
-    Serial.print(pressDuration);
-    Serial.println(F("ms"));
+    // Serial.print(F("[DEBUG] Button released after "));
+    // Serial.print(pressDuration);
+    // Serial.println(F("ms"));
     
     // Check if it was a long press
     if (pressDuration >= LONG_PRESS_TIME) {
       longPressDetected = true;
-      Serial.println(F("[DEBUG] Long press detected"));
+      // Serial.println(F("[DEBUG] Long press detected"));
     } else {
-      Serial.println(F("[DEBUG] Short press detected"));
+      // Serial.println(F("[DEBUG] Short press detected"));
     }
   }
   
