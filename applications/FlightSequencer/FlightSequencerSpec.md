@@ -148,4 +148,75 @@ Phase 2 will add parameter programming capability:
 
 ## Test Duration
 
-Complete flight sequence: 120 seconds (2 minutes) plus initialization and reset time. Multiple test flights recommended to validate timing accuracy and system reliability.
+Complete flight sequence: 30 seconds (debug timing) plus initialization and reset time. Multiple test flights recommended to validate timing accuracy and system reliability.
+
+## Testing Plan
+
+### Phase 1 Testing (Hardcoded Parameters)
+Phase 1 validates core flight control functionality with hardcoded parameters:
+
+**Test 1.1: Basic flight sequence operation**
+- Validate complete Ready → Armed → Launch → Motor Run → Glide → DT Deploy → Landing sequence
+- Verify timing: 10 second motor run, 30 second total flight time
+- Confirm LED status patterns and servo control
+- Validate serial output messages
+
+**Test 1.2: Reset and run sequence again**
+- Complete full flight sequence
+- Long press to reset from Landing state
+- Execute second complete flight sequence
+- Verify state variables reset properly between flights
+
+**Test 1.3: Emergency cutoff from all states**
+- Test emergency button press during Motor Spool phase
+- Test emergency button press during Motor Run phase  
+- Verify immediate motor shutoff and transition to Landing state
+- Confirm system can be reset after emergency shutoff
+
+### Phase 2 Testing (Parameter Programming - Future)
+Phase 2 adds parameter programming capability via serial interface:
+
+**Implementation Prerequisite:**
+- Implement Phase 2: Parameter programming interface
+
+**Test 2.1: Regression testing of basic operations**
+- Re-validate all Phase 1 test cases with parameter programming enabled
+- Ensure core flight functionality unchanged
+
+**Test 2.2: Run sequence with new motor time**
+- Program new motor run time via serial interface
+- Execute flight sequence with modified timing
+- Verify parameter change affects flight behavior
+
+**Test 2.3: Run sequence with new DT time** 
+- Program new total flight time via serial interface
+- Execute flight sequence with modified timing
+- Verify dethermalizer deployment timing changes
+
+**Test 2.4: Run sequence with new max speed**
+- Program new motor speed via serial interface
+- Execute flight sequence with modified motor speed
+- Verify PWM output changes and motor response
+
+**Test 2.5: Recall parameters after hardware reset**
+- Program custom parameters
+- Perform hardware reset (reset button)
+- Verify parameters restored from FlashStorage
+
+**Test 2.6: Recall parameters after power cycle**
+- Program custom parameters
+- Power cycle the system (disconnect/reconnect power)
+- Verify parameters restored from non-volatile storage
+
+**Test 2.7: Reset parameters to system defaults**
+- Program custom parameters
+- Execute parameter reset command via serial interface
+- Verify system returns to factory default parameters
+- Confirm defaults are stored in non-volatile memory
+
+### Test Progression Strategy
+
+1. **Complete Phase 1 testing** before proceeding to Phase 2 implementation
+2. **Phase 2 implementation** adds serial command interface and FlashStorage
+3. **Phase 2 testing** validates parameter programming while ensuring Phase 1 functionality remains intact
+4. **Regression testing** ensures new features don't break existing functionality

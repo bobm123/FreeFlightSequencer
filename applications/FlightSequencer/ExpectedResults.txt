@@ -1,0 +1,47 @@
+[INFO] FlightSequencer starting...
+[INFO] Phase 1: Hardcoded parameters
+[INFO] Motor run time: 20 seconds
+[INFO] Total flight time: 120 seconds
+[INFO] Motor speed: 1500µs PWM
+[INFO] System ready - press button to arm
+
+[INFO] System ARMED - release button to launch
+
+[INFO] LAUNCH! Motor spooling...
+[INFO] Motor at flight speed: 1500µs
+
+[INFO] Motor run complete - entering glide phase
+
+[INFO] Flight time complete - deploying DT
+[INFO] Dethermalizer DEPLOYED
+[INFO] Dethermalizer retracted - flight complete
+
+[INFO] System RESET - ready for new flight
+
+--- LED Status Patterns ---
+Ready State: Double blink heartbeat (red, off, red, off, long pause)
+Armed State: Fast continuous blinking (100ms on/off)
+Motor Spool: Solid red LED  
+Motor Run: Solid red LED
+Glide Phase: Slow blink (500ms on/off cycle)
+DT Deploy: Solid red LED during deployment
+Landing: Single slow blink (50ms on, 2950ms off)
+
+--- Button Operations ---
+Ready → Armed: Press button (LED changes to fast blink)
+Armed → Launch: Release button (motor starts spooling)
+Emergency Shutoff: Press button during motor run (immediate motor stop)
+Reset: Hold button 3+ seconds in Landing state (return to Ready)
+
+--- Flight Timing ---
+Motor Spool: ~3 seconds (smooth ramp from 950µs to 1500µs)
+Motor Run: 20.0 seconds at 1500µs PWM
+Glide Phase: Remaining time until 120.0 seconds total elapsed
+DT Deploy: 2.0 seconds deployment, then retract
+Total Flight: 120.0 seconds from launch to landing
+
+--- Servo Positions ---
+Motor Idle: 950µs PWM pulse
+Motor Flight: 1500µs PWM pulse  
+DT Retracted: 1000µs PWM pulse
+DT Deployed: 2000µs PWM pulse
