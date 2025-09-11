@@ -80,9 +80,18 @@ const unsigned long LONG_PRESS_TIME = 1500; // 1.5 seconds for long press
 unsigned long armTime = 0;
 const unsigned long ARM_DELAY = 500; // 500ms delay before launch is possible
 
+// LED pattern types
+enum LedPattern {
+  LED_OFF,
+  LED_SOLID_RED,
+  LED_HEARTBEAT,
+  LED_FAST_FLASH,
+  LED_SLOW_BLINK,
+  LED_LANDING_BLINK
+};
+
 // Function prototypes
-void setLedRed();
-void setLedOff(); 
+void updateLED(LedPattern pattern, unsigned long currentTime);
 void updateButtonState();
 void initializeSystem();
 void resetStateVariables();
@@ -200,47 +209,10 @@ void initializeSystem() {
 }
 
 int executeReadyState(int currentState) {
-  // Heartbeat LED pattern (double blink, pause)
-  static unsigned long lastHeartbeat = 0;
-  static int heartbeatStep = 0;
-  
   unsigned long currentTime = millis();
   
-  switch (heartbeatStep) {
-    case 0: // First blink on
-      if (currentTime - lastHeartbeat >= 0) {
-        setLedRed();
-        lastHeartbeat = currentTime;
-        heartbeatStep = 1;
-      }
-      break;
-    case 1: // First blink off
-      if (currentTime - lastHeartbeat >= 50) {
-        setLedOff();
-        lastHeartbeat = currentTime;
-        heartbeatStep = 2;
-      }
-      break;
-    case 2: // Brief pause
-      if (currentTime - lastHeartbeat >= 100) {
-        setLedRed();
-        lastHeartbeat = currentTime;
-        heartbeatStep = 3;
-      }
-      break;
-    case 3: // Second blink off
-      if (currentTime - lastHeartbeat >= 50) {
-        setLedOff();
-        lastHeartbeat = currentTime;
-        heartbeatStep = 4;
-      }
-      break;
-    case 4: // Long pause
-      if (currentTime - lastHeartbeat >= 850) {
-        heartbeatStep = 0;
-      }
-      break;
-  }
+  // Heartbeat LED pattern
+  updateLED(LED_HEARTBEAT, currentTime);
   
   // Check for arming (requires long press)
   if (longPressDetected) {
@@ -262,21 +234,10 @@ int executeReadyState(int currentState) {
 }
 
 int executeArmedState(int currentState) {
-  // Fast LED flash
-  static unsigned long lastFlash = 0;
-  static bool ledState = false;
-  
   unsigned long currentTime = millis();
   
-  if (currentTime - lastFlash >= 100) {
-    if (ledState) {
-      setLedOff();
-    } else {
-      setLedRed();
-    }
-    ledState = !ledState;
-    lastFlash = currentTime;
-  }
+  // Fast LED flash
+  updateLED(LED_FAST_FLASH, currentTime);
   
   // Check for launch (short press, with delay after arming)
   if (buttonJustReleased && (millis() - armTime > ARM_DELAY)) {
@@ -318,8 +279,10 @@ void resetStateVariables() {
 }
 
 int executeMotorSpoolState(int currentState) {
+  unsigned long currentTime = millis();
+  
   // LED on during spool
-  setLedRed();
+  updateLED(LED_SOLID_RED, currentTime);
   
   if (!spoolStateEntered) {
     // Serial.println(F("[DEBUG] Entered Motor Spool State"));
@@ -355,8 +318,10 @@ int executeMotorSpoolState(int currentState) {
 }
 
 int executeMotorRunState(int currentState) {
+  unsigned long currentTime = millis();
+  
   // LED on during motor run
-  setLedRed();
+  updateLED(LED_SOLID_RED, currentTime);
   
   // Maintain motor at flight speed
   motorServo.writeMicroseconds(MOTOR_SPEED * 10);
@@ -387,21 +352,10 @@ int executeMotorRunState(int currentState) {
 }
 
 int executeGlideState(int currentState) {
-  // Slow LED blink (1 second cycle)
-  static unsigned long lastBlink = 0;
-  static bool ledState = false;
-  
   unsigned long currentTime = millis();
   
-  if (currentTime - lastBlink >= 500) {
-    if (ledState) {
-      setLedOff();
-    } else {
-      setLedRed();
-    }
-    ledState = !ledState;
-    lastBlink = currentTime;
-  }
+  // Slow LED blink (1 second cycle)
+  updateLED(LED_SLOW_BLINK, currentTime);
   
   // Ensure motor stays idle
   motorServo.writeMicroseconds(MIN_SPEED * 10);
@@ -426,9 +380,10 @@ int executeGlideState(int currentState) {
 
 int executeDTDeployState(int currentState) {
   static unsigned long deployTime = 0;
+  unsigned long currentTime = millis();
   
   // LED on during deployment
-  setLedRed();
+  updateLED(LED_SOLID_RED, currentTime);
   
   // Ensure motor stays idle
   motorServo.writeMicroseconds(MIN_SPEED * 10);
@@ -450,21 +405,10 @@ int executeDTDeployState(int currentState) {
 }
 
 int executeLandingState(int currentState) {
-  // Slow single blink (3 second cycle)
-  static unsigned long lastBlink = 0;
-  static bool ledState = false;
-  
   unsigned long currentTime = millis();
   
-  if (currentTime - lastBlink >= 50 && !ledState) {
-    setLedRed();
-    ledState = true;
-    lastBlink = currentTime;
-  } else if (currentTime - lastBlink >= 2950 && ledState) {
-    setLedOff();
-    ledState = false;
-    lastBlink = currentTime;
-  }
+  // Landing blink pattern (50ms on, 2950ms off)
+  updateLED(LED_LANDING_BLINK, currentTime);
   
   // Ensure safe servo positions
   motorServo.writeMicroseconds(MIN_SPEED * 10);
@@ -542,12 +486,107 @@ void updateButtonState() {
   buttonCurrentlyPressed = currentlyPressed;
 }
 
-void setLedRed() {
-  pixel.setPixelColor(0, pixel.Color(255, 0, 0)); // Bright red
-  pixel.show();
-}
-
-void setLedOff() {
-  pixel.setPixelColor(0, pixel.Color(0, 0, 0));   // Off
-  pixel.show();
+void updateLED(LedPattern pattern, unsigned long currentTime) {
+  static unsigned long lastChange = 0;
+  static int step = 0;
+  static bool ledState = false;
+  
+  switch (pattern) {
+    case LED_OFF:
+      pixel.setPixelColor(0, pixel.Color(0, 0, 0));   // Off
+      pixel.show();
+      break;
+      
+    case LED_SOLID_RED:
+      pixel.setPixelColor(0, pixel.Color(255, 0, 0)); // Bright red
+      pixel.show();
+      break;
+      
+    case LED_HEARTBEAT: {
+      // Double blink pattern: on(50ms) - off(100ms) - on(50ms) - off(850ms)
+      switch (step) {
+        case 0: // First blink on
+          if (currentTime - lastChange >= 0) {
+            pixel.setPixelColor(0, pixel.Color(255, 0, 0));
+            pixel.show();
+            lastChange = currentTime;
+            step = 1;
+          }
+          break;
+        case 1: // First blink off
+          if (currentTime - lastChange >= 50) {
+            pixel.setPixelColor(0, pixel.Color(0, 0, 0));
+            pixel.show();
+            lastChange = currentTime;
+            step = 2;
+          }
+          break;
+        case 2: // Brief pause
+          if (currentTime - lastChange >= 100) {
+            pixel.setPixelColor(0, pixel.Color(255, 0, 0));
+            pixel.show();
+            lastChange = currentTime;
+            step = 3;
+          }
+          break;
+        case 3: // Second blink off
+          if (currentTime - lastChange >= 50) {
+            pixel.setPixelColor(0, pixel.Color(0, 0, 0));
+            pixel.show();
+            lastChange = currentTime;
+            step = 4;
+          }
+          break;
+        case 4: // Long pause
+          if (currentTime - lastChange >= 850) {
+            step = 0;
+          }
+          break;
+      }
+      break;
+    }
+    
+    case LED_FAST_FLASH:
+      // 100ms on/off cycle
+      if (currentTime - lastChange >= 100) {
+        if (ledState) {
+          pixel.setPixelColor(0, pixel.Color(0, 0, 0));
+        } else {
+          pixel.setPixelColor(0, pixel.Color(255, 0, 0));
+        }
+        pixel.show();
+        ledState = !ledState;
+        lastChange = currentTime;
+      }
+      break;
+      
+    case LED_SLOW_BLINK:
+      // 500ms on/off cycle
+      if (currentTime - lastChange >= 500) {
+        if (ledState) {
+          pixel.setPixelColor(0, pixel.Color(0, 0, 0));
+        } else {
+          pixel.setPixelColor(0, pixel.Color(255, 0, 0));
+        }
+        pixel.show();
+        ledState = !ledState;
+        lastChange = currentTime;
+      }
+      break;
+      
+    case LED_LANDING_BLINK:
+      // 50ms on, 2950ms off cycle (3 second total)
+      if (!ledState && currentTime - lastChange >= 50) {
+        pixel.setPixelColor(0, pixel.Color(255, 0, 0));
+        pixel.show();
+        ledState = true;
+        lastChange = currentTime;
+      } else if (ledState && currentTime - lastChange >= 2950) {
+        pixel.setPixelColor(0, pixel.Color(0, 0, 0));
+        pixel.show();
+        ledState = false;
+        lastChange = currentTime;
+      }
+      break;
+  }
 }
