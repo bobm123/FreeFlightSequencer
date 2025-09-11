@@ -43,9 +43,9 @@ Servo motorServo;
 Adafruit_NeoPixel pixel(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 // Hardcoded flight parameters (Phase 1)
-const unsigned short MOTOR_RUN_TIME = 10;    // 10 sec for debug, was 20
+const unsigned short MOTOR_RUN_TIME = 8;    // 8 sec for debug, was 20
 const unsigned short TOTAL_FLIGHT_TIME = 30; // 30 sec for debug, was 120
-const unsigned short MOTOR_SPEED = 150;      // 150 -> 1500µs PWM pulse
+const unsigned short MOTOR_SPEED = 130;      // 130 -> 1300µs PWM pulse
 
 // Servo control constants
 const int MIN_SPEED = 95;            // 95 -> 950µs pulse (motor idle)
@@ -86,6 +86,13 @@ void setLedOff();
 void updateButtonState();
 void initializeSystem();
 void resetStateVariables();
+int executeReadyState(int currentState);
+int executeArmedState(int currentState);
+int executeMotorSpoolState(int currentState);
+int executeMotorRunState(int currentState);
+int executeGlideState(int currentState);
+int executeDTDeployState(int currentState);
+int executeLandingState(int currentState);
 
 void setup() {
   // Initialize serial communication
@@ -110,34 +117,44 @@ void loop() {
   // Execute current flight state
   switch (flightState) {
     case 1: // Ready State
-      executeReadyState();
+      flightState = executeReadyState(flightState);
       break;
       
     case 2: // Armed State  
-      executeArmedState();
+      flightState = executeArmedState(flightState);
       break;
       
     case 3: // Motor Spool State
-      executeMotorSpoolState();
+      flightState = executeMotorSpoolState(flightState);
       break;
       
     case 4: // Motor Run State
-      executeMotorRunState();
+      flightState = executeMotorRunState(flightState);
       break;
       
     case 5: // Glide State
-      executeGlideState();
+      flightState = executeGlideState(flightState);
       break;
       
     case 6: // DT Deploy State
-      executeDTDeployState();
+      flightState = executeDTDeployState(flightState);
       break;
       
     case 99: // Landing State
     default:
-      executeLandingState();
+      flightState = executeLandingState(flightState);
       break;
   }
+
+  //DEBUG - Show state transitions
+  //static int lastReportedState = -1;
+  //if (flightState != lastReportedState) {
+  //  Serial.print(F("[DEBUG] State transition: "));
+  //  Serial.print(lastReportedState);
+  //  Serial.print(F(" -> "));
+  //  Serial.println(flightState);
+  //  lastReportedState = flightState;
+  //}
 }
 
 void initializeSystem() {
@@ -182,7 +199,7 @@ void initializeSystem() {
   Serial.println(F("µs PWM"));
 }
 
-void executeReadyState() {
+int executeReadyState(int currentState) {
   // Heartbeat LED pattern (double blink, pause)
   static unsigned long lastHeartbeat = 0;
   static int heartbeatStep = 0;
@@ -227,18 +244,24 @@ void executeReadyState() {
   
   // Check for arming (requires long press)
   if (longPressDetected) {
-    flightState = 2;
     armTime = millis();
     longPressDetected = false; // Clear the flag
     Serial.println(F("[INFO] System ARMED - short press to launch"));
+    
+    // Clear button flags after processing
+    buttonJustPressed = false;
+    buttonJustReleased = false;
+    return 2; // Transition to Armed State
   }
   
   // Clear button flags after processing
   buttonJustPressed = false;
   buttonJustReleased = false;
+  
+  return currentState; // Stay in Ready State
 }
 
-void executeArmedState() {
+int executeArmedState(int currentState) {
   // Fast LED flash
   static unsigned long lastFlash = 0;
   static bool ledState = false;
@@ -257,7 +280,6 @@ void executeArmedState() {
   
   // Check for launch (short press, with delay after arming)
   if (buttonJustReleased && (millis() - armTime > ARM_DELAY)) {
-    flightState = 3;
     startTime = millis();
     Serial.println(F("[INFO] LAUNCH! Motor spooling..."));
     
@@ -268,11 +290,15 @@ void executeArmedState() {
     buttonJustPressed = false;
     buttonJustReleased = false;
     longPressDetected = false;
+    
+    return 3; // Transition to Motor Spool State
   }
   
   // Reset button flags after processing
   buttonJustPressed = false;
   buttonJustReleased = false;
+  
+  return currentState; // Stay in Armed State
 }
 
 // State variables that need to be reset between flights
@@ -291,7 +317,7 @@ void resetStateVariables() {
   // Serial.println(F("[DEBUG] State variables reset for new flight"));
 }
 
-void executeMotorSpoolState() {
+int executeMotorSpoolState(int currentState) {
   // LED on during spool
   setLedRed();
   
@@ -304,9 +330,8 @@ void executeMotorSpoolState() {
   if (buttonJustPressed) {
     motorServo.writeMicroseconds(MIN_SPEED * 10);
     Serial.println(F("[WARN] Emergency motor shutoff during spool!"));
-    flightState = 99;
     buttonJustPressed = false;
-    return;
+    return 99; // Transition to Landing State
   }
   
   if (!spoolComplete) {
@@ -323,11 +348,13 @@ void executeMotorSpoolState() {
     Serial.print(MOTOR_SPEED * 10);
     Serial.println(F("µs"));
     
-    flightState = 4;
+    return 4; // Transition to Motor Run State
   }
+  
+  return currentState; // Stay in Motor Spool State
 }
 
-void executeMotorRunState() {
+int executeMotorRunState(int currentState) {
   // LED on during motor run
   setLedRed();
   
@@ -345,20 +372,21 @@ void executeMotorRunState() {
   if (buttonJustPressed) {
     motorServo.writeMicroseconds(MIN_SPEED * 10);
     Serial.println(F("[WARN] Emergency motor shutoff!"));
-    flightState = 99;
     buttonJustPressed = false; // Clear the flag
-    return;
+    return 99; // Transition to Landing State
   }
   
   // Check for motor run completion
   if (elapsed >= motorTimeMS) {
     motorServo.writeMicroseconds(MIN_SPEED * 10);
     Serial.println(F("[INFO] Motor run complete - entering glide phase"));
-    flightState = 5;
+    return 5; // Transition to Glide State
   }
+  
+  return currentState; // Stay in Motor Run State
 }
 
-void executeGlideState() {
+int executeGlideState(int currentState) {
   // Slow LED blink (1 second cycle)
   static unsigned long lastBlink = 0;
   static bool ledState = false;
@@ -381,9 +409,8 @@ void executeGlideState() {
   // Check for emergency cutoff during glide (abort flight, no DT deployment)
   if (buttonJustPressed) {
     Serial.println(F("[WARN] Flight aborted during glide phase!"));
-    flightState = 99;
     buttonJustPressed = false;
-    return;
+    return 99; // Transition to Landing State
   }
   
   unsigned long elapsed = millis() - startTime;
@@ -391,11 +418,13 @@ void executeGlideState() {
   // Check for total flight time completion
   if (elapsed >= totalFlightTimeMS) {
     Serial.println(F("[INFO] Flight time complete - deploying DT"));
-    flightState = 6;
+    return 6; // Transition to DT Deploy State
   }
+  
+  return currentState; // Stay in Glide State
 }
 
-void executeDTDeployState() {
+int executeDTDeployState(int currentState) {
   static unsigned long deployTime = 0;
   
   // LED on during deployment
@@ -414,11 +443,13 @@ void executeDTDeployState() {
     // Hold deployment for 2 seconds, then retract
     dtServo.writeMicroseconds(DT_RETRACT);
     Serial.println(F("[INFO] Dethermalizer retracted - flight complete"));
-    flightState = 99;
+    return 99; // Transition to Landing State
   }
+  
+  return currentState; // Stay in DT Deploy State
 }
 
-void executeLandingState() {
+int executeLandingState(int currentState) {
   // Slow single blink (3 second cycle)
   static unsigned long lastBlink = 0;
   static bool ledState = false;
@@ -442,9 +473,11 @@ void executeLandingState() {
   // Reset logic - long press to reset
   if (longPressDetected) {
     Serial.println(F("[INFO] System RESET - ready for new flight"));
-    flightState = 1;
     longPressDetected = false; // Clear the flag
+    return 1; // Transition to Ready State
   }
+  
+  return currentState; // Stay in Landing State
 }
 
 void updateButtonState() {
