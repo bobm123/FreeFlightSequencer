@@ -1,12 +1,52 @@
 [INFO] FlightSequencer starting...
-[INFO] Phase 1: Hardcoded parameters
-[INFO] Motor run time: 10 seconds
-[INFO] Total flight time: 30 seconds
-[INFO] Motor speed: 1500µs PWM
+[INFO] Phase 2: Serial parameter programming
+[INFO] Loading default parameters
+[OK] Parameters saved to flash memory
+[INFO] Current Parameters
+[INFO] Motor Run Time: 20 seconds
+[INFO] Total Flight Time: 120 seconds
+[INFO] Motor Speed: 150 (1500µs PWM)
 [INFO] System ready - press button to arm
+[INFO] Send '?' for parameter commands
+
+--- Serial Parameter Programming Examples ---
+> ?
+[INFO] FlightSequencer Parameter Commands:
+[INFO] M <sec>   - Set motor run time (5-60)
+[INFO] T <sec>   - Set total flight time (30-600)
+[INFO] S <speed> - Set motor speed (95-200)
+[INFO] G         - Get current parameters
+[INFO] R         - Reset to defaults
+[INFO] ?         - Show this help
+
+> G
+[INFO] Current Parameters
+[INFO] Motor Run Time: 20 seconds
+[INFO] Total Flight Time: 120 seconds
+[INFO] Motor Speed: 150 (1500µs PWM)
+
+> M 15
+[OK] Parameters saved to flash memory
+[OK] Motor Run Time = 15 seconds
+
+> T 90
+[OK] Parameters saved to flash memory
+[OK] Total Flight Time = 90 seconds
+
+> S 140
+[OK] Parameters saved to flash memory
+[OK] Motor Speed = 140 (1400µs PWM)
+
+> G
+[INFO] Current Parameters
+[INFO] Motor Run Time: 15 seconds
+[INFO] Total Flight Time: 90 seconds
+[INFO] Motor Speed: 140 (1400µs PWM)
+
+--- Flight Execution (with custom parameters) ---
 [INFO] System ARMED - short press to launch
 [INFO] LAUNCH! Motor spooling...
-[INFO] Motor at flight speed: 1500µs
+[INFO] Motor at flight speed: 1400µs
 [INFO] Motor run complete - entering glide phase
 [INFO] Flight time complete - deploying DT
 [INFO] Dethermalizer DEPLOYED

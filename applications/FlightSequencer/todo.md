@@ -37,12 +37,30 @@
 - Keep core flight states: Ready(1) → Armed(2) → Motor Spool(3) → Motor Run(4) → Glide(5) → DT Deploy(6) → Landing(99)
 - Emergency cutoff available in states 3, 4, and 5 (active flight phases)
 
-## Phase 2: Parameter Programming (Future)
-*Deferred tasks:*
-- Create test application for FlashStorage non-volatile memory interface
-- Create serial command interface for parameter programming  
-- Replace EEPROM calls with FlashStorage for parameter storage
-- Implement parameter adjustment, storage, recall, and reset via PC serial interface
+## Phase 2: Parameter Programming ✅ COMPLETED
+
+### Core Implementation Tasks
+- [x] ~~Add FlashStorage library integration~~ *(completed)*
+- [x] ~~Create FlightParameters struct for parameter storage~~ *(completed)*
+- [x] ~~Replace hardcoded constants with dynamic parameter system~~ *(completed)*
+- [x] ~~Implement serial command interface (M/T/S/G/R/? commands)~~ *(completed)*
+- [x] ~~Add parameter validation logic~~ *(completed)*
+- [x] ~~Add FlashStorage parameter persistence~~ *(completed)*
+- [x] ~~Update initialization to load saved parameters~~ *(completed)*
+
+### Serial Command Interface
+- **M <sec>**: Set motor run time (5-60 seconds)
+- **T <sec>**: Set total flight time (30-600 seconds) 
+- **S <speed>**: Set motor speed (95-200, maps to 950-2000µs PWM)
+- **G**: Get current parameters
+- **R**: Reset to defaults
+- **?**: Show help
+
+### Parameter Storage
+- **FlashStorage**: Non-volatile parameter storage survives power cycles
+- **Validation**: Range checking and logical relationship validation
+- **Defaults**: 20s motor, 120s total, 150 speed (1500µs PWM)
+- **Safety**: Serial commands only available in Ready(1) or Landing(99) states
 
 ## Key Flight Sequence
 1. **Ready**: Heartbeat LED pattern, wait for long button press

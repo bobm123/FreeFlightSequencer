@@ -22,12 +22,13 @@
  * 7. Landing: Slow blink, hold button 3+ seconds to reset
  * 
  * Original Authors: Stew Meyers (PicAXE), Bob Marchese (ATTiny85)
- * QtPY Port: Phase 1 with hardcoded parameters
+ * QtPY Port: Phase 2 with serial parameter programming
  */
 
 #include <Arduino.h>
 #include <Servo.h>
 #include <Adafruit_NeoPixel.h>
+#include <FlashStorage.h>
 
 // Hardware pin definitions (QtPY SAMD21 via Signal Distribution MkII)
 const int DT_SERVO_PIN = A3;         // Dethermalizer servo (CH1 connector)
@@ -42,10 +43,35 @@ Servo motorServo;
 // NeoPixel LED
 Adafruit_NeoPixel pixel(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
-// Hardcoded flight parameters (Phase 1)
-const unsigned short MOTOR_RUN_TIME = 8;    // 8 sec for debug, was 20
-const unsigned short TOTAL_FLIGHT_TIME = 30; // 30 sec for debug, was 120
-const unsigned short MOTOR_SPEED = 130;      // 130 -> 1300µs PWM pulse
+// Flight parameter structure for FlashStorage
+struct FlightParameters {
+  unsigned short motorRunTime;
+  unsigned short totalFlightTime;
+  unsigned short motorSpeed;
+  bool valid;  // Flag to check if parameters are initialized
+};
+
+// Default parameters
+const FlightParameters DEFAULT_PARAMS = {
+  20,    // Motor run time (seconds)
+  120,   // Total flight time (seconds) 
+  150,   // Motor speed (150 -> 1500µs PWM)
+  true   // Valid flag
+};
+
+// Current flight parameters (loaded from FlashStorage or defaults)
+FlightParameters currentParams;
+
+// FlashStorage instance
+FlashStorage(flash_store, FlightParameters);
+
+// Parameter validation ranges
+const unsigned short MIN_MOTOR_TIME = 5;
+const unsigned short MAX_MOTOR_TIME = 60;
+const unsigned short MIN_TOTAL_TIME = 30;
+const unsigned short MAX_TOTAL_TIME = 600;
+const unsigned short MIN_MOTOR_SPEED = 95;
+const unsigned short MAX_MOTOR_SPEED = 200;
 
 // Servo control constants
 const int MIN_SPEED = 95;            // 95 -> 950µs pulse (motor idle)
@@ -103,6 +129,15 @@ int executeGlideState(int currentState);
 int executeDTDeployState(int currentState);
 int executeLandingState(int currentState);
 
+// Serial parameter programming functions
+void loadParameters();
+void saveParameters();
+void resetToDefaults();
+bool validateParameters(unsigned short motorTime, unsigned short totalTime, unsigned short motorSpeed);
+void processSerialCommand();
+void showParameters();
+void showHelp();
+
 void setup() {
   // Initialize serial communication
   Serial.begin(9600);
@@ -111,15 +146,26 @@ void setup() {
   }
   
   Serial.println(F("[INFO] FlightSequencer starting..."));
-  Serial.println(F("[INFO] Phase 1: Hardcoded parameters"));
+  Serial.println(F("[INFO] Phase 2: Serial parameter programming"));
+  
+  // Load parameters from FlashStorage
+  loadParameters();
   
   // Initialize hardware
   initializeSystem();
   
+  // Show current parameters
+  showParameters();
   Serial.println(F("[INFO] System ready - press button to arm"));
+  Serial.println(F("[INFO] Send '?' for parameter commands"));
 }
 
 void loop() {
+  // Process serial commands (only when not in active flight)
+  if (flightState == 1 || flightState == 99) {  // Ready or Landing state
+    processSerialCommand();
+  }
+  
   // Update button state with press/release detection
   updateButtonState();
   
@@ -193,19 +239,11 @@ void initializeSystem() {
   dtServo.writeMicroseconds(DT_RETRACT);        // DT retracted
   motorServo.writeMicroseconds(MIN_SPEED * 10); // Motor idle
   
-  // Calculate flight timing
-  motorTimeMS = MOTOR_RUN_TIME * 1000UL;
-  totalFlightTimeMS = TOTAL_FLIGHT_TIME * 1000UL;
+  // Calculate flight timing from current parameters
+  motorTimeMS = currentParams.motorRunTime * 1000UL;
+  totalFlightTimeMS = currentParams.totalFlightTime * 1000UL;
   
-  Serial.print(F("[INFO] Motor run time: "));
-  Serial.print(MOTOR_RUN_TIME);
-  Serial.println(F(" seconds"));
-  Serial.print(F("[INFO] Total flight time: "));
-  Serial.print(TOTAL_FLIGHT_TIME);
-  Serial.println(F(" seconds"));
-  Serial.print(F("[INFO] Motor speed: "));
-  Serial.print(MOTOR_SPEED * 10);
-  Serial.println(F("µs PWM"));
+  // Parameters will be displayed by showParameters() in setup()
 }
 
 int executeReadyState(int currentState) {
@@ -298,17 +336,17 @@ int executeMotorSpoolState(int currentState) {
   }
   
   if (!spoolComplete) {
-    for (int speed = MIN_SPEED; speed <= MOTOR_SPEED; speed += 5) {
+    for (int speed = MIN_SPEED; speed <= currentParams.motorSpeed; speed += 5) {
       motorServo.writeMicroseconds(speed * 10);
       delay(50); // Small delay for smooth ramp
     }
     
     // Ensure final speed is set
-    motorServo.writeMicroseconds(MOTOR_SPEED * 10);
+    motorServo.writeMicroseconds(currentParams.motorSpeed * 10);
     spoolComplete = true;
     
     Serial.print(F("[INFO] Motor at flight speed: "));
-    Serial.print(MOTOR_SPEED * 10);
+    Serial.print(currentParams.motorSpeed * 10);
     Serial.println(F("µs"));
     
     return 4; // Transition to Motor Run State
@@ -324,7 +362,7 @@ int executeMotorRunState(int currentState) {
   updateLED(LED_SOLID_RED, currentTime);
   
   // Maintain motor at flight speed
-  motorServo.writeMicroseconds(MOTOR_SPEED * 10);
+  motorServo.writeMicroseconds(currentParams.motorSpeed * 10);
   
   if (!runStateEntered) {
     // Serial.println(F("[DEBUG] Entered Motor Run State"));
@@ -589,4 +627,232 @@ void updateLED(LedPattern pattern, unsigned long currentTime) {
       }
       break;
   }
+}
+
+// Serial parameter programming functions
+
+void loadParameters() {
+  currentParams = flash_store.read();
+  
+  // If parameters are not valid or this is first boot, use defaults
+  if (!currentParams.valid || 
+      !validateParameters(currentParams.motorRunTime, 
+                         currentParams.totalFlightTime, 
+                         currentParams.motorSpeed)) {
+    Serial.println(F("[INFO] Loading default parameters"));
+    currentParams = DEFAULT_PARAMS;
+    saveParameters();
+  } else {
+    Serial.println(F("[INFO] Parameters loaded from flash memory"));
+  }
+}
+
+void saveParameters() {
+  currentParams.valid = true;
+  flash_store.write(currentParams);
+  Serial.println(F("[OK] Parameters saved to flash memory"));
+}
+
+void resetToDefaults() {
+  currentParams = DEFAULT_PARAMS;
+  saveParameters();
+  
+  // Recalculate timing variables
+  motorTimeMS = currentParams.motorRunTime * 1000UL;
+  totalFlightTimeMS = currentParams.totalFlightTime * 1000UL;
+  
+  Serial.println(F("[OK] Parameters reset to defaults"));
+  showParameters();
+}
+
+bool validateParameters(unsigned short motorTime, unsigned short totalTime, unsigned short motorSpeed) {
+  // Check individual parameter ranges
+  if (motorTime < MIN_MOTOR_TIME || motorTime > MAX_MOTOR_TIME) {
+    return false;
+  }
+  if (totalTime < MIN_TOTAL_TIME || totalTime > MAX_TOTAL_TIME) {
+    return false;
+  }
+  if (motorSpeed < MIN_MOTOR_SPEED || motorSpeed > MAX_MOTOR_SPEED) {
+    return false;
+  }
+  
+  // Check logical relationship: motor time must be less than total time with margin
+  if (motorTime >= totalTime - 5) {
+    return false;
+  }
+  
+  return true;
+}
+
+void processSerialCommand() {
+  if (!Serial.available()) {
+    return;
+  }
+  
+  String command = Serial.readStringUntil('\n');
+  command.trim();
+  command.toUpperCase();
+  
+  if (command.length() == 0) {
+    return;
+  }
+  
+  char cmd = command.charAt(0);
+  
+  switch (cmd) {
+    case 'M': {
+      // Motor run time
+      if (command.length() < 3) {
+        Serial.println(F("[ERR] Format: M <seconds>"));
+        return;
+      }
+      
+      int value = command.substring(2).toInt();
+      if (value < MIN_MOTOR_TIME || value > MAX_MOTOR_TIME) {
+        Serial.print(F("[ERR] Motor time out of range ("));
+        Serial.print(MIN_MOTOR_TIME);
+        Serial.print(F("-"));
+        Serial.print(MAX_MOTOR_TIME);
+        Serial.println(F(" seconds)"));
+        return;
+      }
+      
+      if (value >= currentParams.totalFlightTime - 5) {
+        Serial.println(F("[ERR] Motor time must be < total time - 5 sec"));
+        return;
+      }
+      
+      currentParams.motorRunTime = value;
+      motorTimeMS = value * 1000UL;
+      saveParameters();
+      
+      Serial.print(F("[OK] Motor Run Time = "));
+      Serial.print(value);
+      Serial.println(F(" seconds"));
+      break;
+    }
+    
+    case 'T': {
+      // Total flight time
+      if (command.length() < 3) {
+        Serial.println(F("[ERR] Format: T <seconds>"));
+        return;
+      }
+      
+      int value = command.substring(2).toInt();
+      if (value < MIN_TOTAL_TIME || value > MAX_TOTAL_TIME) {
+        Serial.print(F("[ERR] Total time out of range ("));
+        Serial.print(MIN_TOTAL_TIME);
+        Serial.print(F("-"));
+        Serial.print(MAX_TOTAL_TIME);
+        Serial.println(F(" seconds)"));
+        return;
+      }
+      
+      if (value <= currentParams.motorRunTime + 5) {
+        Serial.println(F("[ERR] Total time must be >= motor time + 5 sec"));
+        return;
+      }
+      
+      currentParams.totalFlightTime = value;
+      totalFlightTimeMS = value * 1000UL;
+      saveParameters();
+      
+      Serial.print(F("[OK] Total Flight Time = "));
+      Serial.print(value);
+      Serial.println(F(" seconds"));
+      break;
+    }
+    
+    case 'S': {
+      // Motor speed
+      if (command.length() < 3) {
+        Serial.println(F("[ERR] Format: S <speed>"));
+        return;
+      }
+      
+      int value = command.substring(2).toInt();
+      if (value < MIN_MOTOR_SPEED || value > MAX_MOTOR_SPEED) {
+        Serial.print(F("[ERR] Motor speed out of range ("));
+        Serial.print(MIN_MOTOR_SPEED);
+        Serial.print(F("-"));
+        Serial.print(MAX_MOTOR_SPEED);
+        Serial.println(F(")"));
+        return;
+      }
+      
+      currentParams.motorSpeed = value;
+      saveParameters();
+      
+      Serial.print(F("[OK] Motor Speed = "));
+      Serial.print(value);
+      Serial.print(F(" ("));
+      Serial.print(value * 10);
+      Serial.println(F("µs PWM)"));
+      break;
+    }
+    
+    case 'G': {
+      // Get parameters
+      showParameters();
+      break;
+    }
+    
+    case 'R': {
+      // Reset to defaults
+      resetToDefaults();
+      break;
+    }
+    
+    case '?': {
+      // Help
+      showHelp();
+      break;
+    }
+    
+    default: {
+      Serial.print(F("[ERR] Unknown command: "));
+      Serial.println(cmd);
+      Serial.println(F("[INFO] Send '?' for help"));
+      break;
+    }
+  }
+}
+
+void showParameters() {
+  Serial.println(F("[INFO] Current Parameters"));
+  Serial.print(F("[INFO] Motor Run Time: "));
+  Serial.print(currentParams.motorRunTime);
+  Serial.println(F(" seconds"));
+  Serial.print(F("[INFO] Total Flight Time: "));
+  Serial.print(currentParams.totalFlightTime);
+  Serial.println(F(" seconds"));
+  Serial.print(F("[INFO] Motor Speed: "));
+  Serial.print(currentParams.motorSpeed);
+  Serial.print(F(" ("));
+  Serial.print(currentParams.motorSpeed * 10);
+  Serial.println(F("µs PWM)"));
+}
+
+void showHelp() {
+  Serial.println(F("[INFO] FlightSequencer Parameter Commands:"));
+  Serial.print(F("[INFO] M <sec>   - Set motor run time ("));
+  Serial.print(MIN_MOTOR_TIME);
+  Serial.print(F("-"));
+  Serial.print(MAX_MOTOR_TIME);
+  Serial.println(F(")"));
+  Serial.print(F("[INFO] T <sec>   - Set total flight time ("));
+  Serial.print(MIN_TOTAL_TIME);
+  Serial.print(F("-"));
+  Serial.print(MAX_TOTAL_TIME);
+  Serial.println(F(")"));
+  Serial.print(F("[INFO] S <speed> - Set motor speed ("));
+  Serial.print(MIN_MOTOR_SPEED);
+  Serial.print(F("-"));
+  Serial.print(MAX_MOTOR_SPEED);
+  Serial.println(F(")"));
+  Serial.println(F("[INFO] G         - Get current parameters"));
+  Serial.println(F("[INFO] R         - Reset to defaults"));
+  Serial.println(F("[INFO] ?         - Show this help"));
 }
