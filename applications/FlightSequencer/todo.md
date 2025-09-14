@@ -62,6 +62,19 @@
 - **Defaults**: 20s motor, 120s total, 150 speed (1500µs PWM)
 - **Safety**: Serial commands only available in Ready(1) or Landing(99) states
 
+### Timestamp System ✅ COMPLETED
+- **Format**: mm:ss timestamps for clear time display
+- **Reset**: Timer resets to 00:00 when returning to Ready state
+- **Flight Tracking**: Each flight sequence gets clean timing from 00:00
+
+## Flight Testing Phase
+*Ready for field testing:*
+- [ ] Ground testing with motor ESC and servo hardware
+- [ ] Bench testing of parameter programming via serial interface
+- [ ] Flight testing with actual aircraft for timing validation
+- [ ] Emergency cutoff testing during actual flight phases
+- [ ] Parameter tuning based on flight performance data
+
 ## Key Flight Sequence
 1. **Ready**: Heartbeat LED pattern, wait for long button press
 2. **Armed**: Fast LED flash, short press to launch
