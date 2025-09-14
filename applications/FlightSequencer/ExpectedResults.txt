@@ -44,21 +44,23 @@
 [INFO] Motor Speed: 140 (1400µs PWM)
 
 --- Flight Execution (with custom parameters) ---
-[INFO] System ARMED - short press to launch
-[INFO] LAUNCH! Motor spooling...
-[INFO] Motor at flight speed: 1400µs
-[INFO] Motor run complete - entering glide phase
-[INFO] Flight time complete - deploying DT
-[INFO] Dethermalizer DEPLOYED
-[INFO] Dethermalizer retracted - flight complete
-[INFO] System RESET - ready for new flight
-[INFO] System ARMED - short press to launch
-[INFO] LAUNCH! Motor spooling...
-[INFO] Motor at flight speed: 1500µs
-[INFO] Motor run complete - entering glide phase
-[INFO] Flight time complete - deploying DT
-[INFO] Dethermalizer DEPLOYED
-[INFO] Dethermalizer retracted - flight complete
+[INFO] 00:05 System ARMED - short press to launch
+[INFO] 00:07 LAUNCH! Motor spooling...
+[INFO] 00:10 Motor at flight speed: 1400µs
+[INFO] 00:25 Motor run complete - entering glide phase
+[INFO] 01:37 Flight time complete - deploying DT
+[INFO] 01:37 Dethermalizer DEPLOYED
+[INFO] 01:39 Dethermalizer retracted - flight complete
+[INFO] 01:45 System RESET - ready for new flight
+
+--- Second Flight (timer resets at 00:00) ---
+[INFO] 00:02 System ARMED - short press to launch
+[INFO] 00:04 LAUNCH! Motor spooling...
+[INFO] 00:07 Motor at flight speed: 1400µs
+[INFO] 00:22 Motor run complete - entering glide phase
+[INFO] 01:34 Flight time complete - deploying DT
+[INFO] 01:34 Dethermalizer DEPLOYED
+[INFO] 01:36 Dethermalizer retracted - flight complete
 
 --- LED Status Patterns ---
 Ready State: Double blink heartbeat (red, off, red, off, long pause)
@@ -75,12 +77,16 @@ Armed → Launch: Short press to release button (motor starts spooling)
 Emergency Shutoff: Press button during Motor Spool, Motor Run, or Glide (immediate motor stop)
 Reset: Long press button 1.5+ seconds in Landing state (return to Ready)
 
---- Flight Timing ---
-Motor Spool: ~3 seconds (smooth ramp from 950µs to 1500µs)
-Motor Run: 10.0 seconds at 1500µs PWM
-Glide Phase: Remaining time until 30.0 seconds total elapsed
-DT Deploy: 2.0 seconds deployment, then retract
-Total Flight: 30.0 seconds from launch to landing
+--- Flight Timing (with mm:ss timestamps) ---
+System Armed: ~00:05 after startup
+Launch: ~00:07 (2 seconds after arm)
+Motor at Speed: ~00:10 (3 second spool ramp)
+Motor Run Complete: ~00:25 (15 second motor run with custom params)
+DT Deploy: ~01:37 (90 second total flight with custom params)
+Flight Complete: ~01:39 (2 second DT deployment hold)
+System Reset: ~01:45 (user long-press to reset)
+
+Note: Timer resets to 00:00 when returning to Ready state for new flight
 
 --- Servo Positions ---
 Motor Idle: 950µs PWM pulse

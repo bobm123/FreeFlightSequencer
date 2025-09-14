@@ -83,6 +83,7 @@ const int DT_DEPLOY = 2000;          // 2000µs pulse (dethermalizer deployed)
 unsigned long startTime;
 unsigned long motorTimeMS;
 unsigned long totalFlightTimeMS;
+unsigned long flightStartTime;  // Time when flight sequence begins (for timestamp reset)
 
 // Flight controller state
 int flightState = 1;                 // Start in Ready state
@@ -138,6 +139,9 @@ void processSerialCommand();
 void showParameters();
 void showHelp();
 
+// Timestamp utility function
+void printTimestampedInfo(const __FlashStringHelper* message);
+
 void setup() {
   // Initialize serial communication
   Serial.begin(9600);
@@ -150,6 +154,9 @@ void setup() {
   
   // Load parameters from FlashStorage
   loadParameters();
+  
+  // Initialize flight timing
+  flightStartTime = millis();
   
   // Initialize hardware
   initializeSystem();
@@ -256,7 +263,7 @@ int executeReadyState(int currentState) {
   if (longPressDetected) {
     armTime = millis();
     longPressDetected = false; // Clear the flag
-    Serial.println(F("[INFO] System ARMED - short press to launch"));
+    printTimestampedInfo(F("System ARMED - short press to launch"));
     
     // Clear button flags after processing
     buttonJustPressed = false;
@@ -280,7 +287,7 @@ int executeArmedState(int currentState) {
   // Check for launch (short press, with delay after arming)
   if (buttonJustReleased && (millis() - armTime > ARM_DELAY)) {
     startTime = millis();
-    Serial.println(F("[INFO] LAUNCH! Motor spooling..."));
+    printTimestampedInfo(F("LAUNCH! Motor spooling..."));
     
     // Reset state machine variables for new flight
     resetStateVariables();
@@ -345,7 +352,19 @@ int executeMotorSpoolState(int currentState) {
     motorServo.writeMicroseconds(currentParams.motorSpeed * 10);
     spoolComplete = true;
     
-    Serial.print(F("[INFO] Motor at flight speed: "));
+    // Use custom formatting for motor speed message to include PWM value
+    unsigned long elapsedMs = millis() - flightStartTime;
+    unsigned long totalSeconds = elapsedMs / 1000;
+    unsigned long minutes = totalSeconds / 60;
+    unsigned long seconds = totalSeconds % 60;
+    
+    Serial.print(F("[INFO] "));
+    if (minutes < 10) Serial.print(F("0"));
+    Serial.print(minutes);
+    Serial.print(F(":"));
+    if (seconds < 10) Serial.print(F("0"));
+    Serial.print(seconds);
+    Serial.print(F(" Motor at flight speed: "));
     Serial.print(currentParams.motorSpeed * 10);
     Serial.println(F("µs"));
     
@@ -382,7 +401,7 @@ int executeMotorRunState(int currentState) {
   // Check for motor run completion
   if (elapsed >= motorTimeMS) {
     motorServo.writeMicroseconds(MIN_SPEED * 10);
-    Serial.println(F("[INFO] Motor run complete - entering glide phase"));
+    printTimestampedInfo(F("Motor run complete - entering glide phase"));
     return 5; // Transition to Glide State
   }
   
@@ -409,7 +428,7 @@ int executeGlideState(int currentState) {
   
   // Check for total flight time completion
   if (elapsed >= totalFlightTimeMS) {
-    Serial.println(F("[INFO] Flight time complete - deploying DT"));
+    printTimestampedInfo(F("Flight time complete - deploying DT"));
     return 6; // Transition to DT Deploy State
   }
   
@@ -429,13 +448,13 @@ int executeDTDeployState(int currentState) {
   if (!dtDeployed) {
     // Deploy dethermalizer
     dtServo.writeMicroseconds(DT_DEPLOY);
-    Serial.println(F("[INFO] Dethermalizer DEPLOYED"));
+    printTimestampedInfo(F("Dethermalizer DEPLOYED"));
     deployTime = millis();
     dtDeployed = true;
   } else if (millis() - deployTime >= 2000) {
     // Hold deployment for 2 seconds, then retract
     dtServo.writeMicroseconds(DT_RETRACT);
-    Serial.println(F("[INFO] Dethermalizer retracted - flight complete"));
+    printTimestampedInfo(F("Dethermalizer retracted - flight complete"));
     return 99; // Transition to Landing State
   }
   
@@ -454,8 +473,9 @@ int executeLandingState(int currentState) {
   
   // Reset logic - long press to reset
   if (longPressDetected) {
-    Serial.println(F("[INFO] System RESET - ready for new flight"));
+    printTimestampedInfo(F("System RESET - ready for new flight"));
     longPressDetected = false; // Clear the flag
+    flightStartTime = millis(); // Reset flight timing for new flight
     return 1; // Transition to Ready State
   }
   
@@ -630,6 +650,23 @@ void updateLED(LedPattern pattern, unsigned long currentTime) {
 }
 
 // Serial parameter programming functions
+
+// Timestamp utility function
+void printTimestampedInfo(const __FlashStringHelper* message) {
+  unsigned long elapsedMs = millis() - flightStartTime;
+  unsigned long totalSeconds = elapsedMs / 1000;
+  unsigned long minutes = totalSeconds / 60;
+  unsigned long seconds = totalSeconds % 60;
+  
+  Serial.print(F("[INFO] "));
+  if (minutes < 10) Serial.print(F("0"));
+  Serial.print(minutes);
+  Serial.print(F(":"));
+  if (seconds < 10) Serial.print(F("0"));
+  Serial.print(seconds);
+  Serial.print(F(" "));
+  Serial.println(message);
+}
 
 void loadParameters() {
   currentParams = flash_store.read();
