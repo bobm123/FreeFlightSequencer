@@ -1,0 +1,2 @@
+# Phase 1 Core Communication Dependencies
+pyserial>=3.5
