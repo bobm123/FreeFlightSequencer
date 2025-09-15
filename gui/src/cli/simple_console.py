@@ -36,7 +36,9 @@ class SimpleSerialConsole:
                 return
 
             print("Connected! Type commands to send to Arduino.")
-            print("Commands: 'status' for connection info, 'params' for current parameters, 'quit' to exit")
+            print("FlightSequencer Commands: M <sec>, T <sec>, S <speed>, G, R, ?")
+            print("Friendly Commands: motor <sec>, flight <sec>, speed <value>, get")
+            print("Monitor Commands: 'status', 'params', 'q' to exit")
             print("-" * 60)
 
             # Set up serial data callback
@@ -95,15 +97,24 @@ class SimpleSerialConsole:
             try:
                 user_input = input().strip()
 
-                if user_input.lower() == 'quit':
+                if user_input.lower() == 'quit' or user_input.lower() == 'q':
+                    print("Closing serial port and exiting...")
                     self.connected = False
                     break
                 elif user_input.lower() == 'status':
                     self._show_status()
                 elif user_input.lower() == 'params':
                     self._show_parameters()
+                elif user_input.lower().startswith('motor '):
+                    self._send_motor_command(user_input)
+                elif user_input.lower().startswith('flight '):
+                    self._send_flight_command(user_input)
+                elif user_input.lower().startswith('speed '):
+                    self._send_speed_command(user_input)
+                elif user_input.lower() == 'get':
+                    self._send_get_command()
                 elif user_input:
-                    # Send to Arduino
+                    # Send anything else directly to Arduino
                     if not self.serial_monitor.send_line(user_input):
                         print(f"Send failed: {self.serial_monitor.last_error}")
 
@@ -136,6 +147,53 @@ class SimpleSerialConsole:
                 speed = params['motor_speed']
                 print(f"Motor Speed: {speed} ({speed * 10}µs PWM)")
         print()
+
+    def _send_motor_command(self, user_input):
+        """Convert 'motor 20' to 'M 20' and send to Arduino."""
+        try:
+            parts = user_input.split()
+            if len(parts) == 2:
+                seconds = parts[1]
+                command = f"M {seconds}"
+                print(f"Setting motor run time to {seconds} seconds...")
+                self.serial_monitor.send_line(command)
+            else:
+                print("Usage: motor <seconds>  (e.g., motor 20)")
+        except Exception as e:
+            print(f"Error: {e}")
+
+    def _send_flight_command(self, user_input):
+        """Convert 'flight 120' to 'T 120' and send to Arduino."""
+        try:
+            parts = user_input.split()
+            if len(parts) == 2:
+                seconds = parts[1]
+                command = f"T {seconds}"
+                print(f"Setting total flight time to {seconds} seconds...")
+                self.serial_monitor.send_line(command)
+            else:
+                print("Usage: flight <seconds>  (e.g., flight 120)")
+        except Exception as e:
+            print(f"Error: {e}")
+
+    def _send_speed_command(self, user_input):
+        """Convert 'speed 150' to 'S 150' and send to Arduino."""
+        try:
+            parts = user_input.split()
+            if len(parts) == 2:
+                speed = parts[1]
+                command = f"S {speed}"
+                print(f"Setting motor speed to {speed}...")
+                self.serial_monitor.send_line(command)
+            else:
+                print("Usage: speed <value>  (e.g., speed 150)")
+        except Exception as e:
+            print(f"Error: {e}")
+
+    def _send_get_command(self):
+        """Send 'G' command to get current parameters."""
+        print("Getting current parameters...")
+        self.serial_monitor.send_line("G")
 
 
 def main():
