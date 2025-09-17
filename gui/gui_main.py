@@ -1,6 +1,6 @@
 """
-FlightSequencer GUI Application Entry Point.
-Simple parameter configuration GUI with serial monitoring.
+Multi-Tab Arduino Control GUI Application Entry Point.
+Unified interface for FlightSequencer, GpsAutopilot, and Device Testing.
 
 Usage:
     python gui_main.py
@@ -13,12 +13,12 @@ import os
 # Add src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from gui.simple_gui import main as gui_main
+from gui.multi_tab_gui import main as gui_main
 
 
 def main():
     """Main application entry point."""
-    print("Starting FlightSequencer GUI...")
+    print("Starting Arduino Control Center...")
     gui_main()
 
 
