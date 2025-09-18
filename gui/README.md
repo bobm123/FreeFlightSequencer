@@ -16,12 +16,12 @@ python gui_main.py
 
 ## Features
 
-### 🎯 Multi-Application Support
+### Multi-Application Support
 - **FlightSequencer**: Flight parameter control with profiles and real-time monitoring
 - **GpsAutopilot**: GPS navigation configuration and autonomous flight control
 - **Device Testing**: Hardware validation and diagnostic tools
 
-### 🔧 Key Capabilities
+### Key Capabilities
 - **Auto-Detection**: Automatically identifies connected Arduino application
 - **Real-time Monitoring**: Live parameter updates and status displays
 - **Flight Profiles**: Save/load parameter sets for different aircraft
@@ -38,15 +38,15 @@ python gui_main.py
 
 ```
 gui/
-├── run_gui.py              # Simplified launcher
-├── gui_main.py            # Main entry point
-├── main.py                # Console interface (legacy)
-└── src/                   # Source code modules
-    ├── gui/               # Main GUI application
-    ├── tabs/              # Individual tab interfaces
-    ├── widgets/           # Reusable GUI components
-    ├── core/              # Tab management and monitoring
-    └── communication/     # Serial communication layer
+|-- run_gui.py              # Simplified launcher
+|-- gui_main.py            # Main entry point
+|-- main.py                # Console interface (legacy)
+`-- src/                   # Source code modules
+    |-- gui/               # Main GUI application
+    |-- tabs/              # Individual tab interfaces
+    |-- widgets/           # Reusable GUI components
+    |-- core/              # Tab management and monitoring
+    `-- communication/     # Serial communication layer
 ```
 
 ## Usage

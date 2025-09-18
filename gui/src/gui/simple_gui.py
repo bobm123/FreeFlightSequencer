@@ -185,7 +185,7 @@ class FlightSequencerGUI:
                     self.current_params_text.insert(tk.END, f"Flight Time: {params['total_flight_time']}s\n")
                 if 'motor_speed' in params:
                     speed = params['motor_speed']
-                    self.current_params_text.insert(tk.END, f"Motor Speed: {speed}\n({speed * 10}µs PWM)\n")
+                    self.current_params_text.insert(tk.END, f"Motor Speed: {speed}\n({speed * 10}us PWM)\n")
             else:
                 self.current_params_text.insert(tk.END, "No parameters\nreceived yet")
 

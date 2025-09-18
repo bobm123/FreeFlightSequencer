@@ -315,7 +315,7 @@ class FlightSequencerTab:
                 if 'motor_speed' in params:
                     speed = params['motor_speed']
                     self.current_params_text.insert(tk.END, f"Motor Speed: {speed}\\n")
-                    self.current_params_text.insert(tk.END, f"PWM: {speed * 10}µs\\n")
+                    self.current_params_text.insert(tk.END, f"PWM: {speed * 10}us\\n")
             else:
                 self.current_params_text.insert(tk.END, "No parameters\\nreceived yet")
                 

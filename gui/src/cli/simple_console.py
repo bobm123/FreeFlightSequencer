@@ -145,7 +145,7 @@ class SimpleSerialConsole:
                 print(f"Total Flight Time: {params['total_flight_time']} seconds")
             if 'motor_speed' in params:
                 speed = params['motor_speed']
-                print(f"Motor Speed: {speed} ({speed * 10}µs PWM)")
+                print(f"Motor Speed: {speed} ({speed * 10}us PWM)")
         print()
 
     def _send_motor_command(self, user_input):

@@ -208,7 +208,7 @@ class DeviceTestTab:
         self.servo_status_var = tk.StringVar(value="Status: Unknown")
         ttk.Label(servo_frame, textvariable=self.servo_status_var).pack(side='left')
         
-        self.servo_pos_var = tk.StringVar(value="Position: 0°")
+        self.servo_pos_var = tk.StringVar(value="Position: 0deg")
         ttk.Label(servo_frame, textvariable=self.servo_pos_var).pack(side='right')
         
         # ESC status
@@ -255,7 +255,7 @@ class DeviceTestTab:
         servo_control_frame = ttk.Frame(servo_frame)
         servo_control_frame.pack(fill='x', padx=5, pady=2)
         
-        ttk.Label(servo_control_frame, text="Position (°):").pack(side='left')
+        ttk.Label(servo_control_frame, text="Position (deg):").pack(side='left')
         self.servo_pos_var_manual = tk.StringVar(value="90")
         servo_scale = ttk.Scale(servo_control_frame, from_=0, to=180, orient='horizontal',
                               variable=self.servo_pos_var_manual)
@@ -439,7 +439,7 @@ class DeviceTestTab:
         if servo_match:
             position = int(servo_match.group(1))
             self.device_status['servo']['position'] = position
-            self.device_status['servo']['status'] = f"{position}°"
+            self.device_status['servo']['status'] = f"{position}deg"
             self.device_status['servo']['last_update'] = current_time
             
         # ESC status
@@ -525,7 +525,7 @@ class DeviceTestTab:
             age = current_time - servo_status['last_update'] if servo_status['last_update'] else float('inf')
             if age < 5:
                 self.servo_status_var.set("Status: OK")
-                self.servo_pos_var.set(f"Position: {servo_status['position']}°")
+                self.servo_pos_var.set(f"Position: {servo_status['position']}deg")
             else:
                 self.servo_status_var.set("Status: Unknown")
                 self.servo_pos_var.set("Position: Unknown")

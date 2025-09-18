@@ -23,14 +23,14 @@ def main():
     try:
         # Test tkinter availability
         import tkinter
-        print("✓ tkinter available")
-        
-        # Test pyserial availability  
+        print("[OK] tkinter available")
+
+        # Test pyserial availability
         try:
             import serial
-            print("✓ pyserial available")
+            print("[OK] pyserial available")
         except ImportError:
-            print("⚠ pyserial not found - serial communication will not work")
+            print("[WARN] pyserial not found - serial communication will not work")
             print("Install with: pip install pyserial")
         
         print()

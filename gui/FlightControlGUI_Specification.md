@@ -30,15 +30,15 @@ The Flight Control GUI is a Python-based interface application focused on **Core
 
 ### System Architecture
 ```
-┌─────────────────┐    USB/Serial     ┌──────────────────────┐
-│   Arduino       │◄─────────────────►│  Python GUI App      │
-│   (QtPY SAMD21) │    9600 baud      │  (Portable Desktop)  │
-├─────────────────┤                   ├──────────────────────┤
-│ FlightSequencer │                   │ Core Communication   │
-│ Device Tests    │                   │ Parameter Config     │
-│ GPS Test        │                   │ Portable Field Ops   │
-└─────────────────┘                   │ Basic Monitoring     │
-                                      └──────────────────────┘
++-------------------+    USB/Serial     +------------------------+
+|   Arduino         |<----------------->|  Python GUI App        |
+|   (QtPY SAMD21)   |    9600 baud      |  (Portable Desktop)    |
++-------------------+                   +------------------------+
+| FlightSequencer   |                   | Core Communication     |
+| Device Tests      |                   | Parameter Config       |
+| GPS Test          |                   | Portable Field Ops     |
++-------------------+                   | Basic Monitoring       |
+                                        +------------------------+
 ```
 
 ## Functional Requirements
@@ -55,7 +55,7 @@ The Flight Control GUI is a Python-based interface application focused on **Core
 - **FlightSequencer Parameters**:
   - Motor run time (5-60 seconds)
   - Total flight time (30-600 seconds) 
-  - Motor speed (95-200, 950-2000µs PWM)
+  - Motor speed (95-200, 950-2000us PWM)
 - **Parameter Validation**: Range checking and logical relationship validation
 - **Default Management**: Reset to factory defaults with confirmation
 - **Configuration Persistence**: Save/load parameter sets locally
@@ -85,34 +85,34 @@ The Flight Control GUI is a Python-based interface application focused on **Core
 
 #### Field-Optimized Interface Layout
 ```
-┌──────────────────────────────────────┐
-│ Flight Control  [●] Connected    [≡] │
-├──────────────────────────────────────┤
-│                                      │
-│ ┌─ Motor Run Time ─────────────────┐  │
-│ │  [  20 ] seconds                 │  │
-│ │  [5] [10] [15] [20] [30] [60]    │  │
-│ │         [UPDATE ARDUINO]         │  │
-│ └──────────────────────────────────┘  │
-│                                      │
-│ ┌─ Total Flight Time ──────────────┐  │
-│ │  [ 120 ] seconds                 │  │
-│ │  [60] [90] [120] [180] [300]     │  │
-│ │         [UPDATE ARDUINO]         │  │
-│ └──────────────────────────────────┘  │
-│                                      │
-│ ┌─ Motor Speed ────────────────────┐  │
-│ │  [ 150 ] (1500µs)               │  │
-│ │  [100] [125] [150] [175] [200]   │  │
-│ │         [UPDATE ARDUINO]         │  │
-│ └──────────────────────────────────┘  │
-│                                      │
-│ ┌─ Quick Actions ──────────────────┐  │
-│ │ [GET PARAMS] [SAVE] [DEFAULTS]   │  │
-│ └──────────────────────────────────┘  │
-│                                      │
-│ Status: Ready for flight             │
-└──────────────────────────────────────┘
++------------------------------------+
+| Flight Control  [*] Connected  [=] |
++------------------------------------+
+|                                    |
+| +- Motor Run Time ----------------+ |
+| |  [  20 ] seconds               | |
+| |  [5] [10] [15] [20] [30] [60]  | |
+| |         [UPDATE ARDUINO]       | |
+| +--------------------------------+ |
+|                                    |
+| +- Total Flight Time -------------+ |
+| |  [ 120 ] seconds               | |
+| |  [60] [90] [120] [180] [300]   | |
+| |         [UPDATE ARDUINO]       | |
+| +--------------------------------+ |
+|                                    |
+| +- Motor Speed -------------------+ |
+| |  [ 150 ] (1500us)              | |
+| |  [100] [125] [150] [175] [200] | |
+| |         [UPDATE ARDUINO]       | |
+| +--------------------------------+ |
+|                                    |
+| +- Quick Actions -----------------+ |
+| | [GET PARAMS] [SAVE] [DEFAULTS] | |
+| +--------------------------------+ |
+|                                    |
+| Status: Ready for flight           |
++------------------------------------+
 ```
 
 ### Communication Protocol
@@ -219,57 +219,57 @@ Error Response:  [ERR]:[ERROR_MESSAGE]<LF>
 
 ```
 gui/
-├── FlightControlGUI_Specification.md     # This specification
-├── requirements.txt                       # Python dependencies
-├── README.md                             # Quick start guide
-├── main.py                               # Application entry point
-├── config/
-│   ├── default_config.json              # Default application settings
-│   └── parameter_presets.json           # Common parameter combinations
-├── src/
-│   ├── __init__.py
-│   ├── communication/
-│   │   ├── __init__.py
-│   │   ├── serial_manager.py            # Core serial communication
-│   │   ├── protocol.py                  # FlightSequencer protocol
-│   │   └── port_detector.py             # Auto-detect serial ports
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── parameter_manager.py         # Parameter validation/storage
-│   │   ├── config_manager.py            # Configuration persistence
-│   │   └── validation.py                # Parameter range checking
-│   └── cli/
-│       ├── __init__.py
-│       └── console_app.py               # Command-line interface
-├── tests/
-│   ├── __init__.py
-│   ├── test_communication.py            # Serial communication tests
-│   ├── test_protocol.py                 # Protocol parsing tests
-│   └── test_parameters.py               # Parameter validation tests
-└── docs/
-    ├── communication_protocol.md        # Protocol specification
-    ├── field_operation_guide.md         # Mobile field operation manual
-    └── developer_guide.md               # Development setup
++-- FlightControlGUI_Specification.md     # This specification
++-- requirements.txt                       # Python dependencies
++-- README.md                             # Quick start guide
++-- main.py                               # Application entry point
++-- config/
+|   +-- default_config.json              # Default application settings
+|   +-- parameter_presets.json           # Common parameter combinations
++-- src/
+|   +-- __init__.py
+|   +-- communication/
+|   |   +-- __init__.py
+|   |   +-- serial_manager.py            # Core serial communication
+|   |   +-- protocol.py                  # FlightSequencer protocol
+|   |   +-- port_detector.py             # Auto-detect serial ports
+|   +-- core/
+|   |   +-- __init__.py
+|   |   +-- parameter_manager.py         # Parameter validation/storage
+|   |   +-- config_manager.py            # Configuration persistence
+|   |   +-- validation.py                # Parameter range checking
+|   +-- cli/
+|       +-- __init__.py
+|       +-- console_app.py               # Command-line interface
++-- tests/
+|   +-- __init__.py
+|   +-- test_communication.py            # Serial communication tests
+|   +-- test_protocol.py                 # Protocol parsing tests
+|   +-- test_parameters.py               # Parameter validation tests
++-- docs/
+    +-- communication_protocol.md        # Protocol specification
+    +-- field_operation_guide.md         # Mobile field operation manual
+    +-- developer_guide.md               # Development setup
 ```
 
 ### Future File Structure Extensions
 ```
-├── src/
-│   ├── gui/                             # Phase 2 - Desktop GUI
-│   │   ├── tkinter_app.py               # Tkinter implementation
-│   │   ├── qt_app.py                    # PyQt implementation
-│   │   ├── parameter_panel.py           # Parameter configuration widgets
-│   │   └── status_panel.py              # Connection status display
-│   ├── data/                            # Phase 3+ - Data management
-│   │   ├── logger.py                    # Data logging
-│   │   └── analysis.py                  # Data analysis
-│   ├── gps/                             # Phase 5 - GPS integration
-│   │   ├── gps_manager.py               # GPS data handling
-│   │   └── position_display.py          # Position visualization
-│   └── mobile/                          # Phase 7+ - Mobile platforms
-│       ├── kivy_app.py                  # Cross-platform mobile
-│       ├── ios_app.py                   # iOS native implementation
-│       └── android_app.py               # Android native implementation
++-- src/
+|   +-- gui/                             # Phase 2 - Desktop GUI
+|   |   +-- tkinter_app.py               # Tkinter implementation
+|   |   +-- qt_app.py                    # PyQt implementation
+|   |   +-- parameter_panel.py           # Parameter configuration widgets
+|   |   +-- status_panel.py              # Connection status display
+|   +-- data/                            # Phase 3+ - Data management
+|   |   +-- logger.py                    # Data logging
+|   |   +-- analysis.py                  # Data analysis
+|   +-- gps/                             # Phase 5 - GPS integration
+|   |   +-- gps_manager.py               # GPS data handling
+|   |   +-- position_display.py          # Position visualization
+|   +-- mobile/                          # Phase 7+ - Mobile platforms
+|       +-- kivy_app.py                  # Cross-platform mobile
+|       +-- ios_app.py                   # iOS native implementation
+|       +-- android_app.py               # Android native implementation
 ```
 
 ## Quality Assurance

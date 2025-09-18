@@ -213,7 +213,7 @@ class GpsAutopilotTab:
         range_frame.pack(fill='x', padx=5, pady=2)
         self.range_var = tk.StringVar(value="Range: 0.0m")
         ttk.Label(range_frame, textvariable=self.range_var).pack(side='left')
-        self.bearing_var = tk.StringVar(value="Bearing: 0°")
+        self.bearing_var = tk.StringVar(value="Bearing: 0deg")
         ttk.Label(range_frame, textvariable=self.bearing_var).pack(side='right')
         
         # Control status
@@ -231,7 +231,7 @@ class GpsAutopilotTab:
         # Control outputs
         output_frame = ttk.Frame(ctrl_status_frame)
         output_frame.pack(fill='x', padx=5, pady=2)
-        self.roll_cmd_var = tk.StringVar(value="Roll: 0.0°")
+        self.roll_cmd_var = tk.StringVar(value="Roll: 0.0deg")
         ttk.Label(output_frame, textvariable=self.roll_cmd_var).pack(side='left')
         self.motor_cmd_var = tk.StringVar(value="Motor: 0%")
         ttk.Label(output_frame, textvariable=self.motor_cmd_var).pack(side='right')
@@ -456,14 +456,14 @@ class GpsAutopilotTab:
             
             # Range and bearing
             self.range_var.set(f"Range: {self.nav_data['range_to_datum']:.1f}m")
-            self.bearing_var.set(f"Bearing: {self.nav_data['bearing_to_datum']:.0f}°")
+            self.bearing_var.set(f"Bearing: {self.nav_data['bearing_to_datum']:.0f}deg")
             
             # Modes
             self.flight_mode_var.set(f"Mode: {self.control_data['flight_mode']}")
             self.nav_mode_var.set(f"Nav: {self.nav_data['nav_mode']}")
             
             # Control outputs
-            self.roll_cmd_var.set(f"Roll: {self.control_data['roll_command']:.1f}°")
+            self.roll_cmd_var.set(f"Roll: {self.control_data['roll_command']:.1f}deg")
             self.motor_cmd_var.set(f"Motor: {self.control_data['motor_command']:.0f}%")
             
         self.parent.after(0, update_displays)
