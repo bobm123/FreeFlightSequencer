@@ -12,7 +12,7 @@
  * Serial Output: 9600 baud
  * 
  * Features:
- * - Short press: Cycle through colors (Red → Green → Blue)
+ * - Short press: Cycle through colors (Red -> Green -> Blue)
  * - Long press (1s+): Enter brightness adjustment mode
  * - Auto-return to idle after AUTO_RETURN_TIME seconds of inactivity
  * - Interrupt-driven button handling with debouncing

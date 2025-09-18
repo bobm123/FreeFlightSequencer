@@ -13,7 +13,7 @@
  * 
  * Test validates:
  * - Servo library initialization and attachment
- * - PWM pulse width control (950µs to 2000µs range)  
+ * - PWM pulse width control (950us to 2000us range)  
  * - Motor ESC speed ramp sequences
  * - Dethermalizer deployment/retract sequences
  * - Timing accuracy and servo response
@@ -33,10 +33,10 @@ Servo motorServo;
 Servo dtServo;
 
 // Servo control parameters (matching E36-Timer values)
-const int MIN_SPEED = 95;        // 95 -> 950µs pulse (motor idle)
-const int MAX_SPEED = 200;       // 200 -> 2000µs pulse (motor full)
-const int DT_RETRACT = 1000;     // 1000µs pulse (dethermalizer retracted)
-const int DT_DEPLOY = 2000;      // 2000µs pulse (dethermalizer deployed)
+const int MIN_SPEED = 95;        // 95 -> 950us pulse (motor idle)
+const int MAX_SPEED = 200;       // 200 -> 2000us pulse (motor full)
+const int DT_RETRACT = 1000;     // 1000us pulse (dethermalizer retracted)
+const int DT_DEPLOY = 2000;      // 2000us pulse (dethermalizer deployed)
 
 // Test configuration
 const unsigned long TEST_DURATION = 60000;    // 60 second test duration
@@ -202,7 +202,7 @@ void executeMotorRampUp(unsigned long phaseElapsed) {
       Serial.print(motorSpeed);
       Serial.print(F(" ("));
       Serial.print(motorSpeed * 10);
-      Serial.println(F("µs)"));
+      Serial.println(F("us)"));
       phaseStep = stepIndex;
     }
   } else {
@@ -216,7 +216,7 @@ void executeMotorFullSpeed(unsigned long phaseElapsed) {
     motorServo.writeMicroseconds(MAX_SPEED * 10);
     Serial.print(F("[INFO] Motor at full speed: "));
     Serial.print(MAX_SPEED * 10);
-    Serial.println(F("µs for 3 seconds"));
+    Serial.println(F("us for 3 seconds"));
     phaseMessageSent = true;
   }
   
@@ -240,7 +240,7 @@ void executeMotorRampDown(unsigned long phaseElapsed) {
       Serial.print(motorSpeed);
       Serial.print(F(" ("));
       Serial.print(motorSpeed * 10);
-      Serial.println(F("µs)"));
+      Serial.println(F("us)"));
       phaseStep = stepIndex;
     }
   } else {
@@ -267,7 +267,7 @@ void executeDTDeploy(unsigned long phaseElapsed) {
     dtServo.writeMicroseconds(DT_DEPLOY);
     Serial.print(F("[OK] Dethermalizer deployed: "));
     Serial.print(DT_DEPLOY);
-    Serial.println(F("µs"));
+    Serial.println(F("us"));
     phaseMessageSent = true;
   }
   
@@ -281,7 +281,7 @@ void executeDTRetract(unsigned long phaseElapsed) {
     dtServo.writeMicroseconds(DT_RETRACT);
     Serial.print(F("[OK] Dethermalizer retracted: "));
     Serial.print(DT_RETRACT);
-    Serial.println(F("µs"));
+    Serial.println(F("us"));
     dtDeployCycles++;
     phaseMessageSent = true;
   }
@@ -401,7 +401,7 @@ void completeServoTest() {
   Serial.print(F(" DT deployments, "));
   Serial.print(combinedSequences);
   Serial.println(F(" combined sequences"));
-  Serial.println(F("[INFO] PWM range tested: 950µs to 2000µs"));
+  Serial.println(F("[INFO] PWM range tested: 950us to 2000us"));
   Serial.println(F("[INFO] Servo response: User visual verification required"));
   
   // Flash status LED to indicate completion

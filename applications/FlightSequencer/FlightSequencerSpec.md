@@ -40,26 +40,26 @@ The FlightSequencer application is a port of the E36-Timer from ATTiny85 to QtPY
 7. **Landing (State 99)**: Flight complete, reset available
 
 ### State Transitions
-- **Ready → Armed**: Button press detected
-- **Armed → Motor Spool**: Button released
-- **Motor Spool → Motor Run**: Motor ramp complete
-- **Motor Run → Glide**: 20 second timer expires
-- **Glide → DT Deploy**: 120 second total flight timer expires
-- **DT Deploy → Landing**: Dethermalizer deployment complete
-- **Landing → Ready**: Button held for 3+ seconds
+- **Ready -> Armed**: Button press detected
+- **Armed -> Motor Spool**: Button released
+- **Motor Spool -> Motor Run**: Motor ramp complete
+- **Motor Run -> Glide**: 20 second timer expires
+- **Glide -> DT Deploy**: 120 second total flight timer expires
+- **DT Deploy -> Landing**: Dethermalizer deployment complete
+- **Landing -> Ready**: Button held for 3+ seconds
 
 ## Hardcoded Parameters (Phase 1)
 
 ### Flight Timing
 - **Motor Run Duration**: 20 seconds
 - **Total Flight Duration**: 120 seconds (2 minutes)
-- **Motor Speed**: 150 (1500µs PWM pulse)
+- **Motor Speed**: 150 (1500us PWM pulse)
 
 ### Servo Control
-- **Motor Idle**: 950µs PWM pulse (MIN_SPEED = 95)
-- **Motor Full**: 1500µs PWM pulse (MotSpeed = 150)
-- **DT Retracted**: 1000µs PWM pulse
-- **DT Deployed**: 2000µs PWM pulse
+- **Motor Idle**: 950us PWM pulse (MIN_SPEED = 95)
+- **Motor Full**: 1500us PWM pulse (MotSpeed = 150)
+- **DT Retracted**: 1000us PWM pulse
+- **DT Deployed**: 2000us PWM pulse
 
 ## Expected Behavior
 
@@ -73,16 +73,16 @@ The FlightSequencer application is a port of the E36-Timer from ATTiny85 to QtPY
 - **Landing**: Slow single blink (3 second cycle)
 
 ### Motor Control
-- **Initialization**: Motor set to idle (950µs)
+- **Initialization**: Motor set to idle (950us)
 - **Spool Phase**: Smooth ramp from idle to flight speed
-- **Run Phase**: Maintain constant speed (1500µs)
+- **Run Phase**: Maintain constant speed (1500us)
 - **Shutdown**: Immediate return to idle speed
 - **Emergency**: Button press during run stops motor
 
 ### Dethermalizer Control
-- **Initialization**: Servo retracted (1000µs)
+- **Initialization**: Servo retracted (1000us)
 - **Flight Phase**: Remains retracted
-- **Deployment**: Move to deployed position (2000µs)
+- **Deployment**: Move to deployed position (2000us)
 - **Hold**: Maintain deployment for 2 seconds
 - **Return**: Return to retracted position
 
@@ -105,7 +105,7 @@ The FlightSequencer application is a port of the E36-Timer from ATTiny85 to QtPY
 
 ### Performance Requirements
 1. Motor ramp smooth without jerking
-2. Timing accuracy within ±0.5 seconds
+2. Timing accuracy within +/-0.5 seconds
 3. LED patterns clearly distinguishable
 4. Button response time < 100ms
 5. Servo movements crisp and reliable
@@ -152,37 +152,37 @@ Complete flight sequence: 30 seconds (debug timing) plus initialization and rese
 
 ## Testing Plan
 
-### Phase 1 Testing (Hardcoded Parameters) ✅ COMPLETED
+### Phase 1 Testing (Hardcoded Parameters) [COMPLETED]
 Phase 1 validates core flight control functionality with hardcoded parameters:
 
 **Test 1.1: Basic flight sequence operation**
-- Validate complete Ready → Armed → Launch → Motor Run → Glide → DT Deploy → Landing sequence
+- Validate complete Ready -> Armed -> Launch -> Motor Run -> Glide -> DT Deploy -> Landing sequence
 - Verify timing: 10 second motor run, 30 second total flight time
 - Confirm LED status patterns and servo control
 - Validate serial output messages
 
-**Test 1.2: Reset and run sequence again** *(✅ COMPLETED)*
-- Complete full flight sequence ✅
-- Long press to reset from Landing state ✅
-- Execute second complete flight sequence ✅
-- Verify state variables reset properly between flights ✅
+**Test 1.2: Reset and run sequence again** *([COMPLETED])*
+- Complete full flight sequence [OK]
+- Long press to reset from Landing state [OK]
+- Execute second complete flight sequence [OK]
+- Verify state variables reset properly between flights [OK]
 - **Bug Fixed**: DT deployment static variables now reset correctly between flights
 
-**Test 1.3: Emergency cutoff from all states** *(✅ COMPLETED)*
-- Test emergency button press during Motor Spool phase (immediate motor shutdown) ✅
-- Test emergency button press during Motor Run phase (immediate motor shutdown) ✅
-- Test emergency button press during Glide phase (abort flight, skip DT deployment) ✅
-- Verify immediate motor shutoff and transition to Landing state ✅
-- Confirm system can be reset after emergency shutoff ✅
+**Test 1.3: Emergency cutoff from all states** *([COMPLETED])*
+- Test emergency button press during Motor Spool phase (immediate motor shutdown) [OK]
+- Test emergency button press during Motor Run phase (immediate motor shutdown) [OK]
+- Test emergency button press during Glide phase (abort flight, skip DT deployment) [OK]
+- Verify immediate motor shutoff and transition to Landing state [OK]
+- Confirm system can be reset after emergency shutoff [OK]
 
 ### Emergency Cutoff Behavior by State:
 | Flight State | Emergency Action | Motor Response | DT Deployment | Warning Message |
 |--------------|------------------|----------------|---------------|-----------------|
 | Ready (1) | No action | - | - | - |
 | Armed (2) | No action | - | - | - |
-| Motor Spool (3) | ✅ Emergency stop | → Idle | Skip | Emergency during spool |
-| Motor Run (4) | ✅ Emergency stop | → Idle | Skip | Emergency shutoff |  
-| Glide (5) | ✅ Abort flight | Already idle | Skip | Flight aborted |
+| Motor Spool (3) | [OK] Emergency stop | -> Idle | Skip | Emergency during spool |
+| Motor Run (4) | [OK] Emergency stop | -> Idle | Skip | Emergency shutoff |  
+| Glide (5) | [OK] Abort flight | Already idle | Skip | Flight aborted |
 | DT Deploy (6) | No interruption | Already idle | Complete normally | - |
 | Landing (99) | No action | Idle | - | - |
 

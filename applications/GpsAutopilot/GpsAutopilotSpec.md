@@ -26,22 +26,24 @@ The GpsAutopilot follows a modular architecture with four core libraries adapted
 
 ```
 GpsAutopilot Application
-├── Navigation Library      # GPS processing and state estimation
-├── Control Library         # Flight control algorithms
-├── Communications Library  # Telemetry and parameter management
-├── Math Library           # Mathematical utilities and filters
-└── Hardware Abstraction   # Arduino-specific hardware interfaces
+|-- Navigation Library      # GPS processing and state estimation
+|-- Control Library         # Flight control algorithms
+|-- Communications Library  # Telemetry and parameter management
+|-- Math Library           # Mathematical utilities and filters
+`-- Hardware Abstraction   # Arduino-specific hardware interfaces
 ```
 
 ### State Machine Design
-The system operates through discrete flight phases similar to FlightSequencer but with autonomous guidance:
+The system follows the FlightSequencer state pattern, adapted for GPS-guided autonomous flight:
 
-1. **INITIALIZATION** - Hardware setup and parameter loading
-2. **ALIGNMENT** - IMU calibration and GPS acquisition
-3. **DATUM_CAPTURE** - Establish launch point as reference
-4. **LAUNCH_DETECT** - Detect aircraft launch via accelerometer
-5. **AUTONOMOUS_FLIGHT** - GPS-guided circular flight pattern
-6. **EMERGENCY** - Safety override and recovery modes
+1. **READY** - System initialization, GPS acquisition, waiting for user input
+2. **ARMED** - GPS datum captured, ready for launch sequence
+3. **MOTOR_SPOOL** - Motor ramp-up and launch preparation (3 seconds)
+4. **GPS_GUIDED_FLIGHT** - Autonomous GPS-guided circular flight pattern
+5. **EMERGENCY** - Safety override and recovery modes
+6. **LANDING** - Flight complete, system reset for next flight
+
+**Launch Assumption**: Aircraft is hand-launched within 3 seconds of motor start (MOTOR_SPOOL phase). No accelerometer-based launch detection available with current hardware.
 
 ## Module Specifications
 
@@ -98,9 +100,9 @@ void Control_ResetActuatorSettings(void);         // Update actuator configurati
 ```
 
 **Control Loops**:
-1. **Orbit Control**: Range error → commanded track angle
-2. **Track Control**: Track error → commanded roll angle (with PI controller)
-3. **Roll Control**: Roll error → servo deflection (with PI controller)
+1. **Orbit Control**: Range error -> commanded track angle
+2. **Track Control**: Track error -> commanded roll angle (with PI controller)
+3. **Roll Control**: Roll error -> servo deflection (with PI controller)
 4. **Throttle Control**: Altitude/speed management via motor ESC
 
 **Control Parameters**:
@@ -158,7 +160,7 @@ uint32_t Coms_SendData(uint8_t msgID, const void *pData, uint8_t nBytes); // Sen
 **Core Functions**:
 ```cpp
 // Angle mathematics
-float ModAngle(const float angle);                     // Wrap angle to ±π
+float ModAngle(const float angle);                     // Wrap angle to +/-pi
 float CoordTurn(const float TurnRate, const float Vs); // Coordinated turn bank angle
 
 // Filtering and control
@@ -193,7 +195,7 @@ uint32_t hal_ReadGPS(uint8_t *buffer, uint32_t maxBytes);
 void hal_ReadIMU(float *accel, float *gyro);
 
 // Servo/ESC outputs
-void hal_SetServoPosition(float rollCommand);    // ±1.0 normalized
+void hal_SetServoPosition(float rollCommand);    // +/-1.0 normalized
 void hal_SetMotorSpeed(float throttleCommand);   // 0.0-1.0 normalized
 
 // System timing
@@ -222,7 +224,7 @@ bool hal_ClockMainLoop(float *deltaTime);       // 50Hz main loop timing
 
 **Servo Control**:
 - PWM output for roll control surface
-- 1000-2000μs pulse width, 50Hz update rate
+- 1000-2000us pulse width, 50Hz update rate
 - Position feedback optional
 
 **Motor/ESC Control**:
@@ -293,9 +295,9 @@ Servo_Command = Kp_roll * (Roll_Command - Estimated_Roll) + Ki_roll * Integral_E
 
 ### Phase 3: Flight Testing
 1. **Ground Testing**: Hardware-in-the-loop validation
-2. **Sensor Validation**: GPS and IMU accuracy verification
+2. **Sensor Validation**: GPS accuracy verification (IMU not available)
 3. **Control Loop Testing**: Servo response and stability
-4. **Progressive Flight Testing**: Guided manual → autonomous
+4. **Progressive Flight Testing**: Manual launch -> autonomous
 
 ### Phase 4: Refinement
 1. **Performance Optimization**: Control loop tuning
@@ -334,8 +336,8 @@ typedef struct {
 ### Actuator Parameters
 ```cpp
 typedef struct {
-    float ServoCenter;    // Servo center position (μs) (1400-1600)
-    float ServoRange;     // Servo range (μs) (300-600)
+    float ServoCenter;    // Servo center position (us) (1400-1600)
+    float ServoRange;     // Servo range (us) (300-600)
     float ServoRate;      // Maximum servo rate (deg/s) (60-180)
     float MotorMin;       // Minimum motor speed (%) (0-20)
     float MotorMax;       // Maximum motor speed (%) (80-100)

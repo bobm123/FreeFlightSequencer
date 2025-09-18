@@ -55,7 +55,7 @@ struct FlightParameters {
 const FlightParameters DEFAULT_PARAMS = {
   20,    // Motor run time (seconds)
   120,   // Total flight time (seconds) 
-  150,   // Motor speed (150 -> 1500µs PWM)
+  150,   // Motor speed (150 -> 1500us PWM)
   true   // Valid flag
 };
 
@@ -74,10 +74,10 @@ const unsigned short MIN_MOTOR_SPEED = 95;
 const unsigned short MAX_MOTOR_SPEED = 200;
 
 // Servo control constants
-const int MIN_SPEED = 95;            // 95 -> 950µs pulse (motor idle)
-const int MAX_SPEED = 200;           // 200 -> 2000µs pulse (motor max)
-const int DT_RETRACT = 1000;         // 1000µs pulse (dethermalizer retracted)
-const int DT_DEPLOY = 2000;          // 2000µs pulse (dethermalizer deployed)
+const int MIN_SPEED = 95;            // 95 -> 950us pulse (motor idle)
+const int MAX_SPEED = 200;           // 200 -> 2000us pulse (motor max)
+const int DT_RETRACT = 1000;         // 1000us pulse (dethermalizer retracted)
+const int DT_DEPLOY = 2000;          // 2000us pulse (dethermalizer deployed)
 
 // Flight timing variables
 unsigned long startTime;
@@ -366,7 +366,7 @@ int executeMotorSpoolState(int currentState) {
     Serial.print(seconds);
     Serial.print(F(" Motor at flight speed: "));
     Serial.print(currentParams.motorSpeed * 10);
-    Serial.println(F("µs"));
+    Serial.println(F("us"));
     
     return 4; // Transition to Motor Run State
   }
@@ -826,7 +826,7 @@ void processSerialCommand() {
       Serial.print(value);
       Serial.print(F(" ("));
       Serial.print(value * 10);
-      Serial.println(F("µs PWM)"));
+      Serial.println(F("us PWM)"));
       break;
     }
     
@@ -869,7 +869,7 @@ void showParameters() {
   Serial.print(currentParams.motorSpeed);
   Serial.print(F(" ("));
   Serial.print(currentParams.motorSpeed * 10);
-  Serial.println(F("µs PWM)"));
+  Serial.println(F("us PWM)"));
 }
 
 void showHelp() {

@@ -16,7 +16,7 @@ The ServoTest application validates PWM servo control functionality using the st
 
 ### Primary Validation
 - Arduino Servo library initialization and attachment
-- PWM pulse width control accuracy (950µs to 2000µs range)
+- PWM pulse width control accuracy (950us to 2000us range)
 - Motor ESC speed ramp sequences
 - Dethermalizer deployment/retract sequences
 - Timing accuracy and servo response
@@ -30,15 +30,15 @@ The ServoTest application validates PWM servo control functionality using the st
 
 ### Phase 1: Motor ESC Testing
 1. **Announce**: Display motor test start message
-2. **Ramp Up**: Smooth acceleration from idle (950µs) to full speed (2000µs)
+2. **Ramp Up**: Smooth acceleration from idle (950us) to full speed (2000us)
 3. **Full Speed**: Hold at maximum speed for 3 seconds
 4. **Ramp Down**: Smooth deceleration back to idle speed
 
 ### Phase 2: Dethermalizer Testing
 1. **Announce**: Display DT test start message
-2. **Deploy**: Move servo to deployment position (2000µs)
+2. **Deploy**: Move servo to deployment position (2000us)
 3. **Hold**: Maintain deployment for 2 seconds
-4. **Retract**: Return servo to retracted position (1000µs)
+4. **Retract**: Return servo to retracted position (1000us)
 
 ### Phase 3: Combined Flight Sequence
 1. **Announce**: Display combined sequence start
@@ -61,19 +61,19 @@ The ServoTest application validates PWM servo control functionality using the st
 - **Motor ESC**: Smooth speed transitions without jerking
 - **Dethermalizer**: Crisp position changes between retract/deploy
 - **Timing**: Precise adherence to programmed delays
-- **Range**: Full PWM range utilization (950µs - 2000µs)
+- **Range**: Full PWM range utilization (950us - 2000us)
 
 ### Test Statistics
 - Motor ramp cycles completed
 - Dethermalizer deployment cycles
 - Combined flight sequences executed
-- PWM range verification (950µs to 2000µs)
+- PWM range verification (950us to 2000us)
 
 ## Pass Criteria
 
 ### Functional Requirements
 1. Both servos respond to PWM commands
-2. Full PWM range achieved (950µs minimum, 2000µs maximum)
+2. Full PWM range achieved (950us minimum, 2000us maximum)
 3. Smooth motor speed transitions
 4. Accurate timing between phases
 5. No servo chatter or instability

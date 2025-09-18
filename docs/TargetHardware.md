@@ -120,7 +120,7 @@ Tools > Board > Adafruit SAMD Boards > Adafruit QT Py (SAMD21)
 
 ### GPS Module
 - **Connection**: Hardware UART (Serial1)
-- **Pins**: TX(6) → GPS RX, RX(7) ← GPS TX
+- **Pins**: TX(6) -> GPS RX, RX(7) <- GPS TX
 - **Baud Rate**: Typically 9600 or 38400
 - **Protocol**: NMEA 0183 standard
 

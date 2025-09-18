@@ -11,13 +11,13 @@ This file contains important guidelines and constraints for AI-assisted code gen
 
 **Examples:**
 ```cpp
-// ❌ AVOID - Special Unicode characters
-Serial.println("✅ Test passed");
-Serial.println("❌ Test failed"); 
-Serial.println("🔧 Debug info");
-Serial.println("⚠️ Warning");
+// AVOID - Special Unicode characters
+Serial.println("[PASS] Test passed");
+Serial.println("[FAIL] Test failed");
+Serial.println("[DEBUG] Debug info");
+Serial.println("[WARN] Warning");
 
-// ✅ PREFERRED - Standard ASCII characters
+// PREFERRED - Standard ASCII characters
 Serial.println("[OK] Test passed");
 Serial.println("[FAIL] Test failed");
 Serial.println("[DEBUG] Debug info"); 
@@ -121,10 +121,10 @@ When creating device test applications, follow this standardized structure:
 All test applications must include these four files:
 ```
 applications/DeviceTests/<TestName>/
-├── <TestName>.ino           # Main test sketch
-├── <TestName>Spec.md        # Test specification with objectives and pass criteria
-├── Makefile                 # Arduino build system (using template above)
-└── ExpectedResults.txt      # Sample output showing expected serial messages
+|-- <TestName>.ino           # Main test sketch
+|-- <TestName>Spec.md        # Test specification with objectives and pass criteria
+|-- Makefile                 # Arduino build system (using template above)
+`-- ExpectedResults.txt      # Sample output showing expected serial messages
 ```
 
 #### Test Specification Guidelines

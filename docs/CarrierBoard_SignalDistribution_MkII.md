@@ -80,7 +80,7 @@ D8,D9,D10    | SPI/Expansion        | Available on JP2
 - **Load**: Powers Qt Py + GPS + Servo(s)
 
 #### Power Distribution:
-- ESC BEC → ESC0 connector pin 1 (VBEC)
+- ESC BEC -> ESC0 connector pin 1 (VBEC)
 - VBEC rail powers:
   - Qt Py module (via JP1)
   - GPS module (via GPS0 pin 1)  
@@ -105,12 +105,12 @@ Total Required:   ~2-3A BEC capacity
 ## Signal Compatibility
 
 ### PWM Outputs
-- **Servo Control**: 50Hz PWM, 900-2100µs pulse width (Qt Py A3)
-- **Motor ESC**: 50Hz PWM, 1000-2000µs pulse width (Qt Py A2)
+- **Servo Control**: 50Hz PWM, 900-2100us pulse width (Qt Py A3)
+- **Motor ESC**: 50Hz PWM, 1000-2000us pulse width (Qt Py A2)
 - **Arduino Servo Library**: Compatible with both channels
 
 ### Communication
-- **GPS**: 9600 baud UART (GPS TX → Qt Py RX on pin D7)
+- **GPS**: 9600 baud UART (GPS TX -> Qt Py RX on pin D7)
 - **Ground Station**: USB CDC via Qt Py native USB
 - **I2C**: Available for IMU/sensors on SDA/SCL pins
 

@@ -5,7 +5,7 @@
 [INFO] Current Parameters
 [INFO] Motor Run Time: 20 seconds
 [INFO] Total Flight Time: 120 seconds
-[INFO] Motor Speed: 150 (1500µs PWM)
+[INFO] Motor Speed: 150 (1500us PWM)
 [INFO] System ready - press button to arm
 [INFO] Send '?' for parameter commands
 
@@ -23,7 +23,7 @@
 [INFO] Current Parameters
 [INFO] Motor Run Time: 20 seconds
 [INFO] Total Flight Time: 120 seconds
-[INFO] Motor Speed: 150 (1500µs PWM)
+[INFO] Motor Speed: 150 (1500us PWM)
 
 > M 15
 [OK] Parameters saved to flash memory
@@ -35,18 +35,18 @@
 
 > S 140
 [OK] Parameters saved to flash memory
-[OK] Motor Speed = 140 (1400µs PWM)
+[OK] Motor Speed = 140 (1400us PWM)
 
 > G
 [INFO] Current Parameters
 [INFO] Motor Run Time: 15 seconds
 [INFO] Total Flight Time: 90 seconds
-[INFO] Motor Speed: 140 (1400µs PWM)
+[INFO] Motor Speed: 140 (1400us PWM)
 
 --- Flight Execution (with custom parameters) ---
 [INFO] 00:05 System ARMED - short press to launch
 [INFO] 00:07 LAUNCH! Motor spooling...
-[INFO] 00:10 Motor at flight speed: 1400µs
+[INFO] 00:10 Motor at flight speed: 1400us
 [INFO] 00:25 Motor run complete - entering glide phase
 [INFO] 01:37 Flight time complete - deploying DT
 [INFO] 01:37 Dethermalizer DEPLOYED
@@ -56,7 +56,7 @@
 --- Second Flight (timer resets at 00:00) ---
 [INFO] 00:02 System ARMED - short press to launch
 [INFO] 00:04 LAUNCH! Motor spooling...
-[INFO] 00:07 Motor at flight speed: 1400µs
+[INFO] 00:07 Motor at flight speed: 1400us
 [INFO] 00:22 Motor run complete - entering glide phase
 [INFO] 01:34 Flight time complete - deploying DT
 [INFO] 01:34 Dethermalizer DEPLOYED
@@ -72,8 +72,8 @@ DT Deploy: Solid red LED during deployment
 Landing: Single slow blink (50ms on, 2950ms off)
 
 --- Button Operations ---
-Ready → Armed: Long press button 1.5+ seconds (LED changes to fast blink)
-Armed → Launch: Short press to release button (motor starts spooling)
+Ready -> Armed: Long press button 1.5+ seconds (LED changes to fast blink)
+Armed -> Launch: Short press to release button (motor starts spooling)
 Emergency Shutoff: Press button during Motor Spool, Motor Run, or Glide (immediate motor stop)
 Reset: Long press button 1.5+ seconds in Landing state (return to Ready)
 
@@ -89,7 +89,7 @@ System Reset: ~01:45 (user long-press to reset)
 Note: Timer resets to 00:00 when returning to Ready state for new flight
 
 --- Servo Positions ---
-Motor Idle: 950µs PWM pulse
-Motor Flight: 1500µs PWM pulse  
-DT Retracted: 1000µs PWM pulse
-DT Deployed: 2000µs PWM pulse
+Motor Idle: 950us PWM pulse
+Motor Flight: 1500us PWM pulse  
+DT Retracted: 1000us PWM pulse
+DT Deployed: 2000us PWM pulse

@@ -13,52 +13,52 @@ Connecting to COM4. Press CTRL-C to exit.
 [INFO] Test will run for 60 seconds
 
 [INFO] Testing motor ESC servo ramp sequence
-[OK] Motor speed: 100 (1000µs)
-[OK] Motor speed: 105 (1050µs)
-[OK] Motor speed: 110 (1100µs)
-[OK] Motor speed: 115 (1150µs)
-[OK] Motor speed: 120 (1200µs)
-[OK] Motor speed: 125 (1250µs)
-[OK] Motor speed: 130 (1300µs)
-[OK] Motor speed: 135 (1350µs)
-[OK] Motor speed: 140 (1400µs)
-[OK] Motor speed: 145 (1450µs)
-[OK] Motor speed: 150 (1500µs)
-[OK] Motor speed: 155 (1550µs)
-[OK] Motor speed: 160 (1600µs)
-[OK] Motor speed: 165 (1650µs)
-[OK] Motor speed: 170 (1700µs)
-[OK] Motor speed: 175 (1750µs)
-[OK] Motor speed: 180 (1800µs)
-[OK] Motor speed: 185 (1850µs)
-[OK] Motor speed: 190 (1900µs)
-[OK] Motor speed: 195 (1950µs)
+[OK] Motor speed: 100 (1000us)
+[OK] Motor speed: 105 (1050us)
+[OK] Motor speed: 110 (1100us)
+[OK] Motor speed: 115 (1150us)
+[OK] Motor speed: 120 (1200us)
+[OK] Motor speed: 125 (1250us)
+[OK] Motor speed: 130 (1300us)
+[OK] Motor speed: 135 (1350us)
+[OK] Motor speed: 140 (1400us)
+[OK] Motor speed: 145 (1450us)
+[OK] Motor speed: 150 (1500us)
+[OK] Motor speed: 155 (1550us)
+[OK] Motor speed: 160 (1600us)
+[OK] Motor speed: 165 (1650us)
+[OK] Motor speed: 170 (1700us)
+[OK] Motor speed: 175 (1750us)
+[OK] Motor speed: 180 (1800us)
+[OK] Motor speed: 185 (1850us)
+[OK] Motor speed: 190 (1900us)
+[OK] Motor speed: 195 (1950us)
 [OK] Motor ramp up completed
-[INFO] Motor at full speed: 2000µs for 3 seconds
-[OK] Motor speed: 195 (1950µs)
-[OK] Motor speed: 190 (1900µs)
-[OK] Motor speed: 185 (1850µs)
-[OK] Motor speed: 180 (1800µs)
-[OK] Motor speed: 175 (1750µs)
-[OK] Motor speed: 170 (1700µs)
-[OK] Motor speed: 165 (1650µs)
-[OK] Motor speed: 160 (1600µs)
-[OK] Motor speed: 155 (1550µs)
-[OK] Motor speed: 150 (1500µs)
-[OK] Motor speed: 145 (1450µs)
-[OK] Motor speed: 140 (1400µs)
-[OK] Motor speed: 135 (1350µs)
-[OK] Motor speed: 130 (1300µs)
-[OK] Motor speed: 125 (1250µs)
-[OK] Motor speed: 120 (1200µs)
-[OK] Motor speed: 115 (1150µs)
-[OK] Motor speed: 110 (1100µs)
-[OK] Motor speed: 105 (1050µs)
-[OK] Motor speed: 100 (1000µs)
+[INFO] Motor at full speed: 2000us for 3 seconds
+[OK] Motor speed: 195 (1950us)
+[OK] Motor speed: 190 (1900us)
+[OK] Motor speed: 185 (1850us)
+[OK] Motor speed: 180 (1800us)
+[OK] Motor speed: 175 (1750us)
+[OK] Motor speed: 170 (1700us)
+[OK] Motor speed: 165 (1650us)
+[OK] Motor speed: 160 (1600us)
+[OK] Motor speed: 155 (1550us)
+[OK] Motor speed: 150 (1500us)
+[OK] Motor speed: 145 (1450us)
+[OK] Motor speed: 140 (1400us)
+[OK] Motor speed: 135 (1350us)
+[OK] Motor speed: 130 (1300us)
+[OK] Motor speed: 125 (1250us)
+[OK] Motor speed: 120 (1200us)
+[OK] Motor speed: 115 (1150us)
+[OK] Motor speed: 110 (1100us)
+[OK] Motor speed: 105 (1050us)
+[OK] Motor speed: 100 (1000us)
 [OK] Motor ramp down completed - motor idle
 [INFO] Testing dethermalizer deployment sequence
-[OK] Dethermalizer deployed: 2000µs
-[OK] Dethermalizer retracted: 1000µs
+[OK] Dethermalizer deployed: 2000us
+[OK] Dethermalizer retracted: 1000us
 [INFO] Testing combined flight sequence simulation
 [INFO] Combined sequence: Motor ramping
 [INFO] Combined sequence: Motor at full speed
@@ -68,5 +68,5 @@ Connecting to COM4. Press CTRL-C to exit.
 
 [INFO] Servo Test Complete - verify output
 [INFO] Sequences executed: 1 motor ramps, 1 DT deployments, 1 combined sequences
-[INFO] PWM range tested: 950µs to 2000µs
+[INFO] PWM range tested: 950us to 2000us
 [INFO] Servo response: User visual verification required

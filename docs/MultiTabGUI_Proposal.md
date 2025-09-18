@@ -31,24 +31,24 @@ This proposal outlines the enhancement of the existing FlightSequencer GUI (`gui
 
 ```
 Enhanced GUI Application
-├── gui_main.py                    # Main application entry point
-├── src/
-│   ├── core/
-│   │   ├── tab_manager.py         # NEW: Manages tab lifecycle and communication
-│   │   ├── app_detector.py        # NEW: Auto-detects connected Arduino application
-│   │   └── parameter_monitor.py   # ENHANCED: Multi-app parameter parsing
-│   ├── communication/
-│   │   └── simple_serial.py       # ENHANCED: Multi-app serial handling
-│   ├── tabs/
-│   │   ├── __init__.py            # NEW: Tab module initialization
-│   │   ├── flight_sequencer_tab.py # NEW: Extracted FlightSequencer interface
-│   │   ├── gps_autopilot_tab.py   # NEW: GpsAutopilot interface
-│   │   └── device_test_tab.py     # NEW: Device testing interface
-│   └── widgets/
-│       ├── __init__.py            # NEW: Reusable GUI components
-│       ├── parameter_panel.py     # NEW: Generic parameter control widget
-│       ├── serial_monitor.py      # NEW: Reusable serial display widget
-│       └── connection_panel.py    # NEW: Common connection controls
+|-- gui_main.py                    # Main application entry point
+|-- src/
+|   |-- core/
+|   |   |-- tab_manager.py         # NEW: Manages tab lifecycle and communication
+|   |   |-- app_detector.py        # NEW: Auto-detects connected Arduino application
+|   |   `-- parameter_monitor.py   # ENHANCED: Multi-app parameter parsing
+|   |-- communication/
+|   |   `-- simple_serial.py       # ENHANCED: Multi-app serial handling
+|   |-- tabs/
+|   |   |-- __init__.py            # NEW: Tab module initialization
+|   |   |-- flight_sequencer_tab.py # NEW: Extracted FlightSequencer interface
+|   |   |-- gps_autopilot_tab.py   # NEW: GpsAutopilot interface
+|   |   `-- device_test_tab.py     # NEW: Device testing interface
+|   `-- widgets/
+|       |-- __init__.py            # NEW: Reusable GUI components
+|       |-- parameter_panel.py     # NEW: Generic parameter control widget
+|       |-- serial_monitor.py      # NEW: Reusable serial display widget
+|       `-- connection_panel.py    # NEW: Common connection controls
 ```
 
 ### 2. Main Application Window
@@ -75,7 +75,7 @@ Enhanced GUI Application
 - **Parameter Controls** (Existing functionality):
   - Motor Run Time (1-300 seconds)
   - Total Flight Time (10-600 seconds) 
-  - Motor Speed (95-200, displays μs PWM equivalent)
+  - Motor Speed (95-200, displays us PWM equivalent)
 - **Action Buttons**:
   - Get Parameters, Reset to Defaults
   - Quick presets (Launch Test: M=5,T=30 / Competition: M=20,T=120)

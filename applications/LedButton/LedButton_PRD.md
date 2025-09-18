@@ -20,7 +20,7 @@ Simple interactive application that demonstrates basic GPIO control using button
 ### Button Input Handling
 - **Debounced Press Detection**: Reliable press/release detection with configurable debounce timing
 - **Short Press Actions**: Single press responses (< 1 second hold)
-- **Long Press Actions**: Extended hold responses (≥ 1 second hold)
+- **Long Press Actions**: Extended hold responses (>= 1 second hold)
 - **Interrupt-Driven Input**: Non-blocking input handling using hardware interrupts
 
 ### LED Output Control
@@ -31,7 +31,7 @@ Simple interactive application that demonstrates basic GPIO control using button
 
 ### User Interface Modes
 - **Idle Mode**: LED off, waiting for user input
-- **Color Cycle Mode**: Button press cycles through colors (Red → Green → Blue → Off)
+- **Color Cycle Mode**: Button press cycles through colors (Red -> Green -> Blue -> Off)
 - **Brightness Adjust Mode**: Long press enters brightness adjustment mode
 - **Status Display Mode**: Show system status through LED patterns
 
@@ -45,16 +45,16 @@ Simple interactive application that demonstrates basic GPIO control using button
 
 ### State Machine Design
 ```
-IDLE → [Short Press] → COLOR_CYCLE → [Timeout] → IDLE
-IDLE → [Long Press] → BRIGHTNESS_ADJUST → [Release] → IDLE
-COLOR_CYCLE → [Short Press] → Next Color
-COLOR_CYCLE → [Long Press] → BRIGHTNESS_ADJUST
+IDLE -> [Short Press] -> COLOR_CYCLE -> [Timeout] -> IDLE
+IDLE -> [Long Press] -> BRIGHTNESS_ADJUST -> [Release] -> IDLE
+COLOR_CYCLE -> [Short Press] -> Next Color
+COLOR_CYCLE -> [Long Press] -> BRIGHTNESS_ADJUST
 ```
 
 ### Button Response Timing
 - **Debounce Period**: 50ms minimum for reliable press detection
 - **Short Press**: < 1000ms button hold duration
-- **Long Press**: ≥ 1000ms button hold duration  
+- **Long Press**: >= 1000ms button hold duration  
 - **Auto-Return Timeout**: 10 seconds of inactivity returns to IDLE
 
 ### LED Color Sequence

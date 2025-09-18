@@ -17,7 +17,7 @@ The GpsTest application validates GPS module integration with the QtPY SAMD21 vi
 
 ### Signal Distribution MkII GPS0 Connector
 - **Pin 1**: VBEC (5V power to GPS module)
-- **Pin 2**: GPS-TX → Qt Py RX/TX pin (D6) → Serial1 RX
+- **Pin 2**: GPS-TX -> Qt Py RX/TX pin (D6) -> Serial1 RX
 - **Pin 3**: GND (common ground)
 
 ### Supported GPS Modules
@@ -94,8 +94,8 @@ The GpsTest application validates GPS module integration with the QtPY SAMD21 vi
 ### NMEA Data Stream
 - **Update Rate**: 1Hz (1 update per second) standard
 - **Sentence Types**: Minimum GGA and RMC for basic navigation
-- **Data Accuracy**: ±3 meters horizontal accuracy (clear sky)
-- **Altitude Accuracy**: ±5 meters vertical accuracy
+- **Data Accuracy**: +/-3 meters horizontal accuracy (clear sky)
+- **Altitude Accuracy**: +/-5 meters vertical accuracy
 
 ### Serial Output Format
 - Clear coordinate display in degrees/minutes/seconds and decimal

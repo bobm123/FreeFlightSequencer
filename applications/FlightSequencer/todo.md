@@ -16,7 +16,7 @@
 - [x] ~~Remove all EEPROM code and use hardcoded parameters~~ *(completed)*
 - [x] ~~Create Makefile for FlightSequencer QtPY build system~~ *(completed)*
 
-### Phase 1 Testing ✅ ALL COMPLETE
+### Phase 1 Testing [COMPLETED] ALL COMPLETE
 - [x] ~~Test 1.1: Basic flight sequence operation~~ *(completed - validated complete flight sequence)*
 - [x] ~~Test 1.2: Reset and run sequence again~~ *(completed - fixed static variable reset bug)*
 - [x] ~~Test 1.3: Emergency cutoff from all states~~ *(completed - validated emergency cutoff in states 3, 4, 5)*
@@ -24,7 +24,7 @@
 ### Hardcoded Parameters (Phase 1)
 - **Motor Run Time**: 10 seconds *(debug timing, was 20)*
 - **Total Flight Time**: 30 seconds *(debug timing, was 120)*
-- **Motor Speed**: 150 (1500µs PWM pulse)
+- **Motor Speed**: 150 (1500us PWM pulse)
 
 ### Hardware Changes
 - **Single pushbutton**: Only PB1 for start/arm sequence
@@ -34,10 +34,10 @@
 
 ### State Machine Simplification
 - Remove programming states 95-98 (dual-button parameter adjustment)
-- Keep core flight states: Ready(1) → Armed(2) → Motor Spool(3) → Motor Run(4) → Glide(5) → DT Deploy(6) → Landing(99)
+- Keep core flight states: Ready(1) -> Armed(2) -> Motor Spool(3) -> Motor Run(4) -> Glide(5) -> DT Deploy(6) -> Landing(99)
 - Emergency cutoff available in states 3, 4, and 5 (active flight phases)
 
-## Phase 2: Parameter Programming ✅ COMPLETED
+## Phase 2: Parameter Programming [COMPLETED]
 
 ### Core Implementation Tasks
 - [x] ~~Add FlashStorage library integration~~ *(completed)*
@@ -51,7 +51,7 @@
 ### Serial Command Interface
 - **M <sec>**: Set motor run time (5-60 seconds)
 - **T <sec>**: Set total flight time (30-600 seconds) 
-- **S <speed>**: Set motor speed (95-200, maps to 950-2000µs PWM)
+- **S <speed>**: Set motor speed (95-200, maps to 950-2000us PWM)
 - **G**: Get current parameters
 - **R**: Reset to defaults
 - **?**: Show help
@@ -59,10 +59,10 @@
 ### Parameter Storage
 - **FlashStorage**: Non-volatile parameter storage survives power cycles
 - **Validation**: Range checking and logical relationship validation
-- **Defaults**: 20s motor, 120s total, 150 speed (1500µs PWM)
+- **Defaults**: 20s motor, 120s total, 150 speed (1500us PWM)
 - **Safety**: Serial commands only available in Ready(1) or Landing(99) states
 
-### Timestamp System ✅ COMPLETED
+### Timestamp System [COMPLETED]
 - **Format**: mm:ss timestamps for clear time display
 - **Reset**: Timer resets to 00:00 when returning to Ready state
 - **Flight Tracking**: Each flight sequence gets clean timing from 00:00
@@ -78,8 +78,8 @@
 ## Key Flight Sequence
 1. **Ready**: Heartbeat LED pattern, wait for long button press
 2. **Armed**: Fast LED flash, short press to launch
-3. **Motor Spool**: LED on, ramp motor to speed *(Emergency: Button press → Landing)*
-4. **Motor Run**: LED on, motor at full speed for 10 seconds *(Emergency: Button press → Landing)*
-5. **Glide**: LED slow blink, motor off, wait for 30 seconds total *(Emergency: Button press → Landing, skip DT)*
+3. **Motor Spool**: LED on, ramp motor to speed *(Emergency: Button press -> Landing)*
+4. **Motor Run**: LED on, motor at full speed for 10 seconds *(Emergency: Button press -> Landing)*
+5. **Glide**: LED slow blink, motor off, wait for 30 seconds total *(Emergency: Button press -> Landing, skip DT)*
 6. **DT Deploy**: Deploy dethermalizer servo *(No emergency cutoff)*
 7. **Landing**: Slow blink, long press to reset

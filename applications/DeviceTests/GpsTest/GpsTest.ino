@@ -12,7 +12,7 @@
  * - 5V BEC power supply
  * 
  * GPS Connection:
- * - GPS-TX → Qt Py TX/RX (D6) → Serial1 RX
+ * - GPS-TX -> Qt Py TX/RX (D6) -> Serial1 RX
  * - GPS power from VBEC (5V)
  * - Common ground connection
  * 
@@ -390,9 +390,9 @@ void displayGPSStatus(unsigned long currentTime) {
   if (gps.hasValidFix) {
     Serial.print(F("Position: "));
     Serial.print(gps.latitude, 6);
-    Serial.print(F("°, "));
+    Serial.print(F("deg, "));
     Serial.print(gps.longitude, 6);
-    Serial.println(F("°"));
+    Serial.println(F("deg"));
     
     Serial.print(F("Altitude: "));
     Serial.print(gps.altitude, 1);
@@ -400,7 +400,7 @@ void displayGPSStatus(unsigned long currentTime) {
     Serial.print(gps.speed, 1);
     Serial.print(F("km/h, Course: "));
     Serial.print(gps.course, 1);
-    Serial.println(F("°"));
+    Serial.println(F("deg"));
   }
   
   if (gps.hasValidTime) {

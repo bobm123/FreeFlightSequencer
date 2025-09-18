@@ -14,7 +14,7 @@ This comprehensive guide covers integrating existing C libraries and legacy code
 
 ### Fundamentals
 - Arduino IDE compiles `.ino` files as C++ and automatically generates prototypes
-- You can add `.c` and `.h` files directly — the build system compiles them with `avr-gcc` or the board's compiler
+- You can add `.c` and `.h` files directly - the build system compiles them with `avr-gcc` or the board's compiler
 - Arduino provides its own `main()`, so your C code must not define `main()`
 - Use `extern "C"` in headers when calling C functions from C++ code to prevent name mangling
 
@@ -282,42 +282,42 @@ void longCalculation() {
 ### Simple Template
 ```
 MyArduinoProject/
-├── MyArduinoProject.ino          # Main Arduino sketch
-├── wrapper.h                     # C++ safe wrapper header
-├── wrapper.cpp                   # Arduino wrapper implementations
-├── mylib.c                       # Original C code
-└── mylib.h                       # Original C header
+|-- MyArduinoProject.ino          # Main Arduino sketch
+|-- wrapper.h                     # C++ safe wrapper header
+|-- wrapper.cpp                   # Arduino wrapper implementations
+|-- mylib.c                       # Original C code
+`-- mylib.h                       # Original C header
 ```
 
 ### Advanced Template (for larger projects with multiple libraries)
 ```
 MyArduinoProject/
-├── MyArduinoProject.ino          # Main Arduino sketch
-├── arduino_main.h                # Main Arduino interface header
-├── arduino_main.cpp              # Main Arduino interface implementation
-├── lib/                          # Original C code libraries (unchanged)
-│   ├── module1/                  # First software module
-│   │   ├── module1.h
-│   │   └── module1.c
-│   ├── module2/                  # Second software module
-│   │   ├── module2.h  
-│   │   └── module2.c
-│   └── moduleN/                  # Additional modules as needed
-│       ├── moduleN.h
-│       └── moduleN.c
-├── hardware/                     # Arduino hardware abstraction layer
-│   ├── hal_common.h              # Common HAL definitions
-│   ├── hal_device1.h             # Device-specific interfaces
-│   ├── hal_device1.cpp
-│   └── hal_deviceN.cpp           # Additional devices as needed
-├── wrappers/                     # Arduino-C integration wrappers
-│   ├── module1_wrapper.h         # One wrapper per software module
-│   ├── module1_wrapper.cpp
-│   ├── module2_wrapper.h
-│   ├── module2_wrapper.cpp
-│   └── hardware_wrapper.h        # Hardware abstraction wrapper
-└── docs/
-    └── arduino-c-integration-guide.md
+|-- MyArduinoProject.ino          # Main Arduino sketch
+|-- arduino_main.h                # Main Arduino interface header
+|-- arduino_main.cpp              # Main Arduino interface implementation
+|-- lib/                          # Original C code libraries (unchanged)
+|   |-- module1/                  # First software module
+|   |   |-- module1.h
+|   |   `-- module1.c
+|   |-- module2/                  # Second software module
+|   |   |-- module2.h  
+|   |   `-- module2.c
+|   `-- moduleN/                  # Additional modules as needed
+|       |-- moduleN.h
+|       `-- moduleN.c
+|-- hardware/                     # Arduino hardware abstraction layer
+|   |-- hal_common.h              # Common HAL definitions
+|   |-- hal_device1.h             # Device-specific interfaces
+|   |-- hal_device1.cpp
+|   `-- hal_deviceN.cpp           # Additional devices as needed
+|-- wrappers/                     # Arduino-C integration wrappers
+|   |-- module1_wrapper.h         # One wrapper per software module
+|   |-- module1_wrapper.cpp
+|   |-- module2_wrapper.h
+|   |-- module2_wrapper.cpp
+|   `-- hardware_wrapper.h        # Hardware abstraction wrapper
+`-- docs/
+    `-- arduino-c-integration-guide.md
 ```
 
 ## Complete Implementation Examples
@@ -556,18 +556,18 @@ void runIntegrationTests() {
     
     // Test 1: Basic functionality
     my_c_function(100);
-    Serial.println("✓ Basic function call");
+    Serial.println("[OK] Basic function call");
     
     // Test 2: Memory constraints
     uint8_t testData[32];
     uint16_t checksum;
     if(safe_calculate_checksum(testData, sizeof(testData), &checksum)) {
-        Serial.println("✓ Checksum calculation");
+        Serial.println("[OK] Checksum calculation");
     }
     
     // Test 3: Error handling
     if(!arduino_process_data(NULL, 0)) {
-        Serial.println("✓ Error handling");
+        Serial.println("[OK] Error handling");
     }
     
     Serial.println("All tests completed");

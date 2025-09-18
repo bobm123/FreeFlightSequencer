@@ -46,8 +46,8 @@ Last GPS Update: 0 seconds ago
 Test Time: 0:50
 Fix Status: [OK] 3D Fix (Type: 1)
 Satellites: 6 tracked, HDOP: 1.20
-Position: 40.712775°, -74.006058°
-Altitude: 23.4m, Speed: 0.0km/h, Course: 0.0°
+Position: 40.712775deg, -74.006058deg
+Altitude: 23.4m, Speed: 0.0km/h, Course: 0.0deg
 GPS Time: 18:25:15 23/09/14
 
 === Test Statistics ===
@@ -67,8 +67,8 @@ Last GPS Update: 0 seconds ago
 Test Time: 1:35
 Fix Status: [OK] 3D Fix (Type: 1)
 Satellites: 8 tracked, HDOP: 0.95
-Position: 40.712778°, -74.006061°
-Altitude: 24.1m, Speed: 2.3km/h, Course: 127.5°
+Position: 40.712778deg, -74.006061deg
+Altitude: 24.1m, Speed: 2.3km/h, Course: 127.5deg
 GPS Time: 18:26:00 23/09/14
 
 === Test Statistics ===
@@ -88,8 +88,8 @@ Last GPS Update: 0 seconds ago
 Test Time: 2:00
 Fix Status: [OK] 3D Fix (Type: 1)
 Satellites: 9 tracked, HDOP: 0.87
-Position: 40.712801°, -74.006089°
-Altitude: 25.8m, Speed: 4.7km/h, Course: 245.2°
+Position: 40.712801deg, -74.006089deg
+Altitude: 25.8m, Speed: 4.7km/h, Course: 245.2deg
 GPS Time: 18:26:25 23/09/14
 
 === Test Statistics ===
@@ -103,8 +103,8 @@ Last GPS Update: 0 seconds ago
 Test Time: 5:00
 Fix Status: [OK] 3D Fix (Type: 1)
 Satellites: 10 tracked, HDOP: 0.78
-Position: 40.712834°, -74.006142°
-Altitude: 27.3m, Speed: 1.2km/h, Course: 312.8°
+Position: 40.712834deg, -74.006142deg
+Altitude: 27.3m, Speed: 1.2km/h, Course: 312.8deg
 GPS Time: 18:29:25 23/09/14
 
 === Test Statistics ===
@@ -124,8 +124,8 @@ Last GPS Update: 0 seconds ago
 Test Time: 10:00
 Fix Status: [OK] 3D Fix (Type: 1)
 Satellites: 8 tracked, HDOP: 1.02
-Position: 40.712889°, -74.006201°
-Altitude: 29.1m, Speed: 0.5km/h, Course: 089.3°
+Position: 40.712889deg, -74.006201deg
+Altitude: 29.1m, Speed: 0.5km/h, Course: 089.3deg
 GPS Time: 18:34:25 23/09/14
 
 === Test Statistics ===
@@ -139,8 +139,8 @@ Last GPS Update: 0 seconds ago
 Test Time: 15:00
 Fix Status: [OK] 3D Fix (Type: 1)
 Satellites: 9 tracked, HDOP: 0.91
-Position: 40.712911°, -74.006234°
-Altitude: 30.7m, Speed: 0.8km/h, Course: 156.7°
+Position: 40.712911deg, -74.006234deg
+Altitude: 30.7m, Speed: 0.8km/h, Course: 156.7deg
 GPS Time: 18:39:25 23/09/14
 
 === Test Statistics ===
@@ -166,8 +166,8 @@ GPS Update Rate: 1 Hz (1 sentence per second)
 NMEA Parsing Success: ~99% (normal for real-world conditions)
 Memory Usage: Well within Arduino constraints
 Time to First Fix: 47 seconds (typical for cold start)
-Position Accuracy: ±3-5 meters (standard GPS accuracy)
-Altitude Accuracy: ±5-10 meters (barometric reference dependent)
+Position Accuracy: +/-3-5 meters (standard GPS accuracy)
+Altitude Accuracy: +/-5-10 meters (barometric reference dependent)
 
 --- GPS Module Health Indicators ---
 Satellite Tracking: 6-10 satellites (excellent)
