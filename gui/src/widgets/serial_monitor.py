@@ -101,8 +101,8 @@ class SerialMonitorWidget:
                 
             # Add the message
             self.output.insert(tk.END, text, tag)
-            if not text.endswith('\\n'):
-                self.output.insert(tk.END, '\\n', tag)
+            if not text.endswith('\n'):
+                self.output.insert(tk.END, '\n', tag)
                 
             # Limit number of lines
             self.line_count += 1

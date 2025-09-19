@@ -35,7 +35,6 @@
 #include <Servo.h>
 #include <Adafruit_NeoPixel.h>
 #include <FlashStorage.h>
-#include <SoftwareSerial.h>
 
 // Include autopilot libraries
 #include "config.h"
@@ -67,7 +66,7 @@ enum FlightState {
 Servo rollServo;
 Servo motorServo;
 Adafruit_NeoPixel pixel(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
-SoftwareSerial gpsSerial(GPS_RX_PIN, GPS_TX_PIN);
+// GPS uses hardware Serial1 (TX/RX pins on QtPY SAMD21)
 
 // Flight parameters structure for FlashStorage
 struct FlightParameters {
@@ -99,9 +98,13 @@ const FlightParameters DEFAULT_PARAMS = {
   },
   // Actuator parameters
   {
-    1500.0,   // ServoCenter - Servo center position (us) (1400-1600)
-    400.0,    // ServoRange - Servo range (us) (300-600)
-    90.0,     // ServoRate - Maximum servo rate (deg/s) (60-180)
+    1500.0,   // RollServoCenter - Center position (us) (1400-1600)
+    400.0,    // RollServoRange - Total range (us) (300-600)
+    90.0,     // RollServoRate - Maximum servo rate (deg/s) (60-180)
+    false,    // RollServoReversed - Direction: false=Normal, true=Inverted
+    1000.0,   // RollServoMinPulse - Minimum pulse width (us) (800-1200)
+    2000.0,   // RollServoMaxPulse - Maximum pulse width (us) (1800-2200)
+    10.0,     // RollServoDeadband - Center deadband (us) (5-20)
     10.0,     // MotorMin - Minimum motor speed (%) (0-20)
     80.0,     // MotorMax - Maximum motor speed (%) (80-100)
     1         // nMotorType - Motor type: 0=DC, 1=ESC
@@ -143,14 +146,16 @@ const unsigned long LONG_PRESS_TIME = 1500; // 1.5 seconds for long press
 unsigned long armTime = 0;
 const unsigned long ARM_DELAY = 500; // 500ms delay before launch is possible
 
-// LED pattern types (from FlightSequencer)
+// LED pattern types (standardized from FlightSequencer)
 enum LedPattern {
   LED_OFF,
   LED_SOLID_RED,
   LED_HEARTBEAT,
   LED_FAST_FLASH,
   LED_SLOW_BLINK,
-  LED_LANDING_BLINK
+  LED_EMERGENCY_FLASH,
+  LED_LANDING_BLINK,
+  LED_GPS_SEARCHING
 };
 
 // Function prototypes
@@ -214,9 +219,22 @@ void loop() {
   updateButtonState();
 
   // Update GPS data
-  if (gpsSerial.available()) {
-    // Process GPS data through navigation library
-    gpsValid = Nav_UpdateGPS(&navState);
+  if (Serial1.available()) {
+    // Process incoming GPS data
+    Nav_UpdateGPS(&navState);
+  }
+
+  // Validate GPS status (should be called regularly, not just when data arrives)
+  bool wasValid = gpsValid;
+  gpsValid = Nav_Step(&navState, deltaTime);
+
+  // Debug GPS state changes
+  if (gpsValid != wasValid) {
+    if (gpsValid) {
+      Serial.println(F("[DEBUG] GPS became valid"));
+    } else {
+      Serial.println(F("[DEBUG] GPS became invalid"));
+    }
   }
 
   // Execute current flight state
@@ -280,11 +298,11 @@ void initializeSystem() {
   motorServo.attach(MOTOR_SERVO_PIN);
 
   // Set servos to safe initial positions
-  rollServo.writeMicroseconds(currentParams.actuator.ServoCenter);  // Roll neutral
+  rollServo.writeMicroseconds(currentParams.actuator.RollServoCenter);  // Roll neutral
   motorServo.writeMicroseconds(1000);  // Motor idle
 
   // Initialize GPS
-  gpsSerial.begin(9600);
+  Serial1.begin(9600);
 
   // Initialize hardware abstraction layer
   HAL_Init();
@@ -295,12 +313,22 @@ void initializeSystem() {
 FlightState executeReadyState(FlightState currentState) {
   unsigned long currentTime = millis();
 
-  // Heartbeat LED pattern
-  updateLED(LED_HEARTBEAT, currentTime);
+  // Enhanced GPS status LED logic
+  if (gpsValid && datumSet) {
+    updateLED(LED_HEARTBEAT, currentTime);     // GPS ready - heartbeat
+  } else if (gpsValid) {
+    updateLED(LED_FAST_FLASH, currentTime);    // GPS fix but no datum - fast flash
+  } else {
+    updateLED(LED_GPS_SEARCHING, currentTime); // No GPS fix - orange searching pattern
+  }
 
-  // Check GPS status
+  // Check GPS status (with rate limiting to avoid spam)
   if (gpsValid && !datumSet) {
-    Serial.println(F("[INFO] GPS acquired - ready for datum capture"));
+    static unsigned long lastGpsMessage = 0;
+    if (currentTime - lastGpsMessage > 5000) {  // Only print every 5 seconds
+      Serial.println(F("[INFO] GPS acquired - ready for datum capture"));
+      lastGpsMessage = currentTime;
+    }
   }
 
   // Check for arming (requires long press and GPS valid)
@@ -412,11 +440,11 @@ FlightState executeGpsGuidedFlightState(FlightState currentState) {
     float motorCommand = controlState.motorCommand;
 
     // Convert roll command to servo position
-    int rollPWM = currentParams.actuator.ServoCenter +
-                  rollCommand * currentParams.actuator.ServoRange / 2.0;
+    int rollPWM = currentParams.actuator.RollServoCenter +
+                  rollCommand * currentParams.actuator.RollServoRange / 2.0;
     rollPWM = constrain(rollPWM,
-                       currentParams.actuator.ServoCenter - currentParams.actuator.ServoRange/2,
-                       currentParams.actuator.ServoCenter + currentParams.actuator.ServoRange/2);
+                       currentParams.actuator.RollServoCenter - currentParams.actuator.RollServoRange/2,
+                       currentParams.actuator.RollServoCenter + currentParams.actuator.RollServoRange/2);
 
     // Convert motor command to ESC signal
     int motorPWM = 1000 + motorCommand * 1000;
@@ -443,12 +471,12 @@ FlightState executeGpsGuidedFlightState(FlightState currentState) {
 FlightState executeEmergencyState(FlightState currentState) {
   unsigned long currentTime = millis();
 
-  // LED on during emergency
-  updateLED(LED_SOLID_RED, currentTime);
+  // Emergency LED flash pattern
+  updateLED(LED_EMERGENCY_FLASH, currentTime);
 
   // Ensure safe servo positions
   motorServo.writeMicroseconds(1000);  // Motor idle
-  rollServo.writeMicroseconds(currentParams.actuator.ServoCenter);  // Roll neutral
+  rollServo.writeMicroseconds(currentParams.actuator.RollServoCenter);  // Roll neutral
 
   // Reset logic - long press to go to landing
   if (longPressDetected) {
@@ -468,7 +496,7 @@ FlightState executeLandingState(FlightState currentState) {
 
   // Ensure safe servo positions
   motorServo.writeMicroseconds(1000);  // Motor idle
-  rollServo.writeMicroseconds(currentParams.actuator.ServoCenter);  // Roll neutral
+  rollServo.writeMicroseconds(currentParams.actuator.RollServoCenter);  // Roll neutral
 
   // Reset logic - long press to reset
   if (longPressDetected) {
@@ -505,6 +533,7 @@ void updateButtonState() {
     // Button just pressed
     buttonJustPressed = true;
     buttonPressStartTime = millis();
+    Serial.println(F("[BUTTON] Button pressed"));
   }
 
   // Detect release events
@@ -513,9 +542,16 @@ void updateButtonState() {
     buttonJustReleased = true;
     unsigned long pressDuration = millis() - buttonPressStartTime;
 
+    Serial.print(F("[BUTTON] Button released after "));
+    Serial.print(pressDuration);
+    Serial.println(F(" ms"));
+
     // Check if it was a long press
     if (pressDuration >= LONG_PRESS_TIME) {
       longPressDetected = true;
+      Serial.println(F("[BUTTON] Long press detected"));
+    } else {
+      Serial.println(F("[BUTTON] Short press detected"));
     }
   }
 
@@ -604,6 +640,34 @@ void updateLED(LedPattern pattern, unsigned long currentTime) {
           pixel.setPixelColor(0, pixel.Color(0, 0, 0));
         } else {
           pixel.setPixelColor(0, pixel.Color(255, 0, 0));
+        }
+        pixel.show();
+        ledState = !ledState;
+        lastChange = currentTime;
+      }
+      break;
+
+    case LED_EMERGENCY_FLASH:
+      // Very fast 200ms on/off cycle for emergency
+      if (currentTime - lastChange >= 200) {
+        if (ledState) {
+          pixel.setPixelColor(0, pixel.Color(0, 0, 0));
+        } else {
+          pixel.setPixelColor(0, pixel.Color(255, 0, 0));
+        }
+        pixel.show();
+        ledState = !ledState;
+        lastChange = currentTime;
+      }
+      break;
+
+    case LED_GPS_SEARCHING:
+      // Orange/yellow color with 750ms on/off cycle for GPS searching
+      if (currentTime - lastChange >= 750) {
+        if (ledState) {
+          pixel.setPixelColor(0, pixel.Color(0, 0, 0));
+        } else {
+          pixel.setPixelColor(0, pixel.Color(255, 165, 0)); // Orange color
         }
         pixel.show();
         ledState = !ledState;
@@ -706,7 +770,7 @@ void showParameters() {
   Serial.print(currentParams.nav.Vias_nom);
   Serial.println(F(" m/s"));
   Serial.print(F("[INFO] Servo Center: "));
-  Serial.print(currentParams.actuator.ServoCenter);
+  Serial.print(currentParams.actuator.RollServoCenter);
   Serial.println(F(" us"));
 }
 

@@ -11,12 +11,22 @@
 #include <Arduino.h>
 #include <math.h>
 
-// Mathematical constants
+// Mathematical constants (only define if not already defined by Arduino core)
+#ifndef PI
 #define PI 3.14159265358979323846
+#endif
+#ifndef TWO_PI
 #define TWO_PI (2.0 * PI)
+#endif
+#ifndef HALF_PI
 #define HALF_PI (PI / 2.0)
+#endif
+#ifndef RAD_TO_DEG
 #define RAD_TO_DEG (180.0 / PI)
+#endif
+#ifndef DEG_TO_RAD
 #define DEG_TO_RAD (PI / 180.0)
+#endif
 
 // Earth constants
 #define EARTH_RADIUS_M 6371000.0

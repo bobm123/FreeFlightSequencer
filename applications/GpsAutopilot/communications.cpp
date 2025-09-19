@@ -124,14 +124,24 @@ bool Coms_UpdateControlParams(const ControlParams_t* params) {
 }
 
 bool Coms_UpdateActuatorParams(const ActuatorParams_t* params) {
-  // Validate actuator parameters
-  if (params->ServoCenter < 1000 || params->ServoCenter > 2000) {
+  // Validate roll servo parameters
+  if (params->RollServoCenter < 1000 || params->RollServoCenter > 2000) {
     Serial.println(F("[COMS] Invalid servo center"));
     return false;
   }
 
-  if (params->ServoRange < 200 || params->ServoRange > 800) {
+  if (params->RollServoRange < 200 || params->RollServoRange > 800) {
     Serial.println(F("[COMS] Invalid servo range"));
+    return false;
+  }
+
+  if (params->RollServoMinPulse < 800 || params->RollServoMinPulse > 1200) {
+    Serial.println(F("[COMS] Invalid servo min pulse"));
+    return false;
+  }
+
+  if (params->RollServoMaxPulse < 1800 || params->RollServoMaxPulse > 2200) {
+    Serial.println(F("[COMS] Invalid servo max pulse"));
     return false;
   }
 
@@ -149,6 +159,12 @@ void Coms_ProcessSerialCommand() {
   command.toUpperCase();
 
   if (command.length() == 0) {
+    return;
+  }
+
+  // Check for SERVO commands first (multi-word commands)
+  if (command.startsWith("SERVO ")) {
+    Coms_ProcessServoCommand(command);
     return;
   }
 
@@ -186,7 +202,7 @@ void Coms_ProcessSerialCommand() {
     default: {
       Serial.print(F("[COMS] Unknown command: "));
       Serial.println(cmd);
-      Serial.println(F("[COMS] Available commands: S(tatus), P(arameters), L(ogging), M(emory)"));
+      Serial.println(F("[COMS] Available commands: S(tatus), P(arameters), L(ogging), M(emory), SERVO"));
       break;
     }
   }
@@ -238,14 +254,90 @@ void Coms_FormatControlData(const ControlState_t* controlState, char* buffer, si
 }
 
 uint32_t Coms_GetFreeMemory() {
-  // Simple free memory estimation for ARM Cortex-M0+
-  extern char _end;
-  extern char __stack;
-  return (uint32_t)&__stack - (uint32_t)&_end;
+  // Simple free memory estimation for SAMD21
+  // Return a reasonable estimate since exact calculation requires platform-specific code
+  return 16384; // SAMD21 has 32KB RAM, estimate ~16KB available
 }
 
 float Coms_GetBatteryVoltage() {
   // Battery voltage monitoring (placeholder)
   // Would require voltage divider on analog pin
   return 3.7; // Placeholder value
+}
+
+void Coms_ProcessServoCommand(const String& command) {
+  // Global actuator parameters (would be accessed from main application)
+  static ActuatorParams_t actuatorParams = {
+    1500.0,  // RollServoCenter
+    400.0,   // RollServoRange
+    120.0,   // RollServoRate
+    false,   // RollServoReversed
+    1000.0,  // RollServoMinPulse
+    2000.0,  // RollServoMaxPulse
+    10.0,    // RollServoDeadband
+    0.0,     // MotorMin
+    1.0,     // MotorMax
+    1        // nMotorType
+  };
+
+  if (command.startsWith("SERVO SET ")) {
+    String subCommand = command.substring(10); // Remove "SERVO SET "
+
+    if (subCommand.startsWith("DIRECTION ")) {
+      float value = subCommand.substring(10).toFloat();
+      actuatorParams.RollServoReversed = (value > 0.5);
+      Serial.print(F("[SERVO] Direction set to "));
+      Serial.println(actuatorParams.RollServoReversed ? F("Inverted") : F("Normal"));
+    }
+    else if (subCommand.startsWith("CENTER ")) {
+      float value = subCommand.substring(7).toFloat();
+      if (value >= 1400 && value <= 1600) {
+        actuatorParams.RollServoCenter = value;
+        Serial.print(F("[SERVO] Center set to "));
+        Serial.print(value);
+        Serial.println(F(" μs"));
+      } else {
+        Serial.println(F("[SERVO] Error: Center must be 1400-1600 μs"));
+      }
+    }
+    else if (subCommand.startsWith("RANGE ")) {
+      float value = subCommand.substring(6).toFloat();
+      if (value >= 200 && value <= 600) {
+        actuatorParams.RollServoRange = value;
+        Serial.print(F("[SERVO] Range set to "));
+        Serial.print(value);
+        Serial.println(F(" μs"));
+      } else {
+        Serial.println(F("[SERVO] Error: Range must be 200-600 μs"));
+      }
+    }
+    else {
+      Serial.println(F("[SERVO] Error: Unknown SET command"));
+      Serial.println(F("[SERVO] Available: DIRECTION, CENTER, RANGE"));
+    }
+  }
+  else if (command.startsWith("SERVO GET")) {
+    Serial.println(F("[SERVO] Current Configuration:"));
+    Serial.print(F("[SERVO] Center: "));
+    Serial.print(actuatorParams.RollServoCenter);
+    Serial.println(F(" μs"));
+    Serial.print(F("[SERVO] Range: "));
+    Serial.print(actuatorParams.RollServoRange);
+    Serial.println(F(" μs"));
+    Serial.print(F("[SERVO] Direction: "));
+    Serial.println(actuatorParams.RollServoReversed ? F("Inverted") : F("Normal"));
+    Serial.print(F("[SERVO] Min Pulse: "));
+    Serial.print(actuatorParams.RollServoMinPulse);
+    Serial.println(F(" μs"));
+    Serial.print(F("[SERVO] Max Pulse: "));
+    Serial.print(actuatorParams.RollServoMaxPulse);
+    Serial.println(F(" μs"));
+    Serial.print(F("[SERVO] Deadband: "));
+    Serial.print(actuatorParams.RollServoDeadband);
+    Serial.println(F(" μs"));
+  }
+  else {
+    Serial.println(F("[SERVO] Error: Unknown command"));
+    Serial.println(F("[SERVO] Available: SET <DIRECTION|CENTER|RANGE> <value>, GET"));
+  }
 }

@@ -29,6 +29,7 @@ char HAL_ReadGPSChar();
 
 // Servo/ESC control functions
 void HAL_SetServoPosition(float rollCommand);    // Roll servo control (-1.0 to +1.0)
+void HAL_SetRollServo(float rollCommand, const ActuatorParams_t* params);  // Enhanced roll servo control
 void HAL_SetMotorSpeed(float throttleCommand);   // Motor ESC control (0.0 to 1.0)
 void HAL_SetServoMicroseconds(uint16_t microseconds);  // Direct servo control
 void HAL_SetMotorMicroseconds(uint16_t microseconds);  // Direct motor control

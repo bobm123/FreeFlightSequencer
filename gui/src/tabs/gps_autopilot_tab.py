@@ -26,7 +26,11 @@ class GpsAutopilotTab:
         self.parent = parent
         self.serial_monitor = serial_monitor
         self.tab_manager = tab_manager
-        
+
+        # Rate limiting for updates
+        self.last_update_time = 0
+        self.update_interval = 0.1  # Limit updates to 10Hz
+
         # Navigation state
         self.nav_data = {
             'datum_lat': 0.0, 'datum_lon': 0.0, 'datum_alt': 0.0,
@@ -36,12 +40,18 @@ class GpsAutopilotTab:
             'ground_speed': 0.0, 'ground_track': 0.0,
             'nav_mode': 'UNKNOWN', 'gps_fix': False, 'satellites': 0
         }
-        
+
         # Control state
         self.control_data = {
             'flight_mode': 'IDLE', 'control_mode': 'MANUAL',
             'roll_command': 0.0, 'track_command': 0.0,
             'motor_command': 0.0, 'orbit_error': 0.0
+        }
+
+        # Servo configuration state
+        self.servo_config_data = {
+            'center': 1500, 'range': 400, 'direction': 'Normal',
+            'updated': False
         }
         
         # Create main tab frame
@@ -166,7 +176,7 @@ class GpsAutopilotTab:
         # Roll control tab
         roll_tab = ttk.Frame(param_notebook)
         param_notebook.add(roll_tab, text="Roll")
-        
+
         # Roll proportional gain
         roll_kp_frame = ttk.Frame(roll_tab)
         roll_kp_frame.pack(fill='x', padx=5, pady=2)
@@ -175,6 +185,55 @@ class GpsAutopilotTab:
         roll_kp_entry = ttk.Entry(roll_kp_frame, textvariable=self.roll_kp_var, width=8)
         roll_kp_entry.pack(side='left', padx=5)
         ttk.Button(roll_kp_frame, text="Set", command=self._set_roll_kp).pack(side='left', padx=2)
+
+        # Servo configuration tab
+        servo_tab = ttk.Frame(param_notebook)
+        param_notebook.add(servo_tab, text="Servo")
+
+        # Roll servo direction
+        direction_frame = ttk.Frame(servo_tab)
+        direction_frame.pack(fill='x', padx=5, pady=2)
+        ttk.Label(direction_frame, text="Direction:").pack(side='left')
+        self.servo_direction_var = tk.StringVar(value="Normal")
+        direction_combo = ttk.Combobox(direction_frame, textvariable=self.servo_direction_var,
+                                      values=["Normal", "Inverted"], width=10, state='readonly')
+        direction_combo.pack(side='left', padx=5)
+        ttk.Button(direction_frame, text="Set", command=self._set_servo_direction).pack(side='left', padx=2)
+
+        # Roll servo center
+        center_frame = ttk.Frame(servo_tab)
+        center_frame.pack(fill='x', padx=5, pady=2)
+        ttk.Label(center_frame, text="Center (μs):").pack(side='left')
+        self.servo_center_var = tk.StringVar(value="1500")
+        center_entry = ttk.Entry(center_frame, textvariable=self.servo_center_var, width=8)
+        center_entry.pack(side='left', padx=5)
+        ttk.Button(center_frame, text="Set", command=self._set_servo_center).pack(side='left', padx=2)
+
+        # Roll servo range
+        range_frame = ttk.Frame(servo_tab)
+        range_frame.pack(fill='x', padx=5, pady=2)
+        ttk.Label(range_frame, text="Range (μs):").pack(side='left')
+        self.servo_range_var = tk.StringVar(value="400")
+        range_entry = ttk.Entry(range_frame, textvariable=self.servo_range_var, width=8)
+        range_entry.pack(side='left', padx=5)
+        ttk.Button(range_frame, text="Set", command=self._set_servo_range).pack(side='left', padx=2)
+
+        # Servo status display
+        servo_status_frame = ttk.LabelFrame(servo_tab, text="Servo Status")
+        servo_status_frame.pack(fill='x', padx=5, pady=5)
+
+        # Current configuration display
+        self.servo_config_var = tk.StringVar(value="Config: Center=1500μs Range=400μs Dir=Normal")
+        ttk.Label(servo_status_frame, textvariable=self.servo_config_var,
+                 font=('Consolas', 9)).pack(padx=5, pady=2)
+
+        # Servo action buttons
+        servo_action_frame = ttk.Frame(servo_tab)
+        servo_action_frame.pack(fill='x', padx=5, pady=5)
+        ttk.Button(servo_action_frame, text="Get Config",
+                  command=self._get_servo_config).pack(side='left', padx=2)
+        ttk.Button(servo_action_frame, text="Test Servo",
+                  command=self._test_servo).pack(side='left', padx=2)
         
         # Control action buttons
         action_frame = ttk.Frame(control_frame)
@@ -332,6 +391,43 @@ class GpsAutopilotTab:
             self._send_command(f"CTRL SET ROLL_KP {kp}")
         except ValueError as e:
             messagebox.showerror("Invalid Value", str(e))
+
+    # Servo configuration functions
+    def _set_servo_direction(self):
+        """Set roll servo direction."""
+        direction = self.servo_direction_var.get()
+        reversed_val = "1" if direction == "Inverted" else "0"
+        self._send_command(f"SERVO SET DIRECTION {reversed_val}")
+
+    def _set_servo_center(self):
+        """Set roll servo center position."""
+        try:
+            center = float(self.servo_center_var.get())
+            if not (1400 <= center <= 1600):
+                raise ValueError("Center must be 1400-1600 μs")
+            self._send_command(f"SERVO SET CENTER {center}")
+        except ValueError as e:
+            messagebox.showerror("Invalid Value", str(e))
+
+    def _set_servo_range(self):
+        """Set roll servo range."""
+        try:
+            range_val = float(self.servo_range_var.get())
+            if not (200 <= range_val <= 600):
+                raise ValueError("Range must be 200-600 μs")
+            self._send_command(f"SERVO SET RANGE {range_val}")
+        except ValueError as e:
+            messagebox.showerror("Invalid Value", str(e))
+
+    def _get_servo_config(self):
+        """Get current servo configuration."""
+        self._send_command("SERVO GET")
+
+    def _test_servo(self):
+        """Test servo movement."""
+        if messagebox.askyesno("Test Servo",
+                              "Move servo through full range? Ensure aircraft is secure."):
+            self._send_command("SERVO TEST")
             
     def _get_all_parameters(self):
         """Get all parameters from autopilot."""
@@ -367,50 +463,75 @@ class GpsAutopilotTab:
             
     def handle_serial_data(self, data):
         """Handle incoming serial data for GpsAutopilot."""
-        # Display in serial monitor
-        self.serial_monitor_widget.log_received(data)
-        
-        # Parse navigation data
-        self._parse_navigation_data(data)
-        
-        # Parse control data
-        self._parse_control_data(data)
-        
-        # Update displays
-        self._update_status_displays()
+        try:
+            # Display in serial monitor
+            self.serial_monitor_widget.log_received(data)
+
+            # Parse navigation data
+            self._parse_navigation_data(data)
+
+            # Parse control data
+            self._parse_control_data(data)
+
+            # Parse servo data
+            self._parse_servo_data(data)
+
+            # Update displays with rate limiting
+            import time
+            current_time = time.time()
+            if current_time - self.last_update_time >= self.update_interval:
+                self._update_status_displays()
+                self.last_update_time = current_time
+        except Exception as e:
+            print(f"Error handling GPS autopilot data: {e}")
+            # Still display the raw data in serial monitor even if parsing fails
+            try:
+                self.serial_monitor_widget.log_received(data)
+            except:
+                pass
         
     def _parse_navigation_data(self, data):
         """Parse navigation information from serial data."""
-        # GPS fix status
-        gps_fix_match = re.search(r'GPS.*fix.*?(true|false|ok|valid)', data, re.IGNORECASE)
-        if gps_fix_match:
-            self.nav_data['gps_fix'] = gps_fix_match.group(1).lower() in ['true', 'ok', 'valid']
-            
-        # Satellite count
-        sat_match = re.search(r'sat.*?(\d+)', data, re.IGNORECASE)
-        if sat_match:
-            self.nav_data['satellites'] = int(sat_match.group(1))
-            
-        # Position data (N/E/U format)
-        pos_match = re.search(r'pos.*?n[=:]?([-+]?\\d*\\.?\\d+).*?e[=:]?([-+]?\\d*\\.?\\d+).*?u[=:]?([-+]?\\d*\\.?\\d+)', data, re.IGNORECASE)
-        if pos_match:
-            self.nav_data['position_n'] = float(pos_match.group(1))
-            self.nav_data['position_e'] = float(pos_match.group(2))
-            self.nav_data['position_u'] = float(pos_match.group(3))
-            
-        # Range and bearing
-        range_match = re.search(r'range.*?(\\d*\\.?\\d+)', data, re.IGNORECASE)
-        if range_match:
-            self.nav_data['range_to_datum'] = float(range_match.group(1))
-            
-        bearing_match = re.search(r'bearing.*?(\\d*\\.?\\d+)', data, re.IGNORECASE)
-        if bearing_match:
-            self.nav_data['bearing_to_datum'] = float(bearing_match.group(1))
-            
-        # Navigation mode
-        nav_mode_match = re.search(r'nav.*mode.*?([A-Z_]+)', data, re.IGNORECASE)
-        if nav_mode_match:
-            self.nav_data['nav_mode'] = nav_mode_match.group(1).upper()
+        try:
+            # GPS fix status - check multiple formats
+            gps_fix_match = re.search(r'Fix Status:.*\[OK\]|GPS.*fix.*?(true|false|ok|valid)', data, re.IGNORECASE)
+            if gps_fix_match:
+                if '[OK]' in data:
+                    self.nav_data['gps_fix'] = True
+                elif gps_fix_match.group(1):
+                    self.nav_data['gps_fix'] = gps_fix_match.group(1).lower() in ['true', 'ok', 'valid']
+                else:
+                    self.nav_data['gps_fix'] = False
+
+            # Satellite count
+            sat_match = re.search(r'Satellites:\s*(\d+)|sat.*?(\d+)', data, re.IGNORECASE)
+            if sat_match:
+                # Use first group if it matches, otherwise second group
+                sat_count = sat_match.group(1) if sat_match.group(1) else sat_match.group(2)
+                self.nav_data['satellites'] = int(sat_count)
+
+            # Position data (N/E/U format)
+            pos_match = re.search(r'pos.*?n[=:]?([-+]?\d*\.?\d+).*?e[=:]?([-+]?\d*\.?\d+).*?u[=:]?([-+]?\d*\.?\d+)', data, re.IGNORECASE)
+            if pos_match:
+                self.nav_data['position_n'] = float(pos_match.group(1))
+                self.nav_data['position_e'] = float(pos_match.group(2))
+                self.nav_data['position_u'] = float(pos_match.group(3))
+
+            # Range and bearing
+            range_match = re.search(r'range.*?(\d*\.?\d+)', data, re.IGNORECASE)
+            if range_match:
+                self.nav_data['range_to_datum'] = float(range_match.group(1))
+
+            bearing_match = re.search(r'bearing.*?(\d*\.?\d+)', data, re.IGNORECASE)
+            if bearing_match:
+                self.nav_data['bearing_to_datum'] = float(bearing_match.group(1))
+
+            # Navigation mode
+            nav_mode_match = re.search(r'nav.*mode.*?([A-Z_]+)', data, re.IGNORECASE)
+            if nav_mode_match:
+                self.nav_data['nav_mode'] = nav_mode_match.group(1).upper()
+        except Exception as e:
+            print(f"Error parsing navigation data: {e}")
             
     def _parse_control_data(self, data):
         """Parse control information from serial data."""
@@ -420,26 +541,55 @@ class GpsAutopilotTab:
             self.control_data['flight_mode'] = flight_mode_match.group(1).upper()
             
         # Roll command
-        roll_match = re.search(r'roll.*cmd.*?([-+]?\\d*\\.?\\d+)', data, re.IGNORECASE)
+        roll_match = re.search(r'roll.*cmd.*?([-+]?\d*\.?\d+)', data, re.IGNORECASE)
         if roll_match:
             self.control_data['roll_command'] = float(roll_match.group(1))
-            
+
         # Motor command
-        motor_match = re.search(r'motor.*cmd.*?(\\d*\\.?\\d+)', data, re.IGNORECASE)
+        motor_match = re.search(r'motor.*cmd.*?(\d*\.?\d+)', data, re.IGNORECASE)
         if motor_match:
             self.control_data['motor_command'] = float(motor_match.group(1))
             
-        # Control mode (ARM/DISARM status)
+        # Control mode (ARM/DISARM status) - store data only, update GUI later
         if re.search(r'armed', data, re.IGNORECASE):
             self.control_data['control_mode'] = 'ARMED'
-            self.arm_btn.config(text="DISARM")
         elif re.search(r'disarmed', data, re.IGNORECASE):
             self.control_data['control_mode'] = 'DISARMED'
-            self.arm_btn.config(text="ARM")
+
+    def _parse_servo_data(self, data):
+        """Parse servo configuration information from serial data."""
+        # Servo configuration responses - store data only, update GUI later
+        if '[SERVO]' in data:
+            # Center position
+            center_match = re.search(r'center.*?(\d+\.?\d*)', data, re.IGNORECASE)
+            if center_match:
+                center = float(center_match.group(1))
+                self.servo_config_data['center'] = int(center)
+
+            # Range
+            range_match = re.search(r'range.*?(\d+\.?\d*)', data, re.IGNORECASE)
+            if range_match:
+                range_val = float(range_match.group(1))
+                self.servo_config_data['range'] = int(range_val)
+
+            # Direction
+            if 'inverted' in data.lower():
+                self.servo_config_data['direction'] = "Inverted"
+            elif 'normal' in data.lower():
+                self.servo_config_data['direction'] = "Normal"
+
+            # Set flag for GUI update
+            self.servo_config_data['updated'] = True
             
     def _update_status_displays(self):
         """Update all status displays."""
         def update_displays():
+            # Update ARM/DISARM button based on control mode
+            if self.control_data.get('control_mode') == 'ARMED':
+                self.arm_btn.config(text="DISARM")
+            elif self.control_data.get('control_mode') == 'DISARMED':
+                self.arm_btn.config(text="ARM")
+
             # GPS status
             if self.nav_data['gps_fix']:
                 self.gps_status_var.set("GPS: Fix OK")
@@ -465,8 +615,32 @@ class GpsAutopilotTab:
             # Control outputs
             self.roll_cmd_var.set(f"Roll: {self.control_data['roll_command']:.1f}deg")
             self.motor_cmd_var.set(f"Motor: {self.control_data['motor_command']:.0f}%")
-            
+
+            # Update servo configuration if changed
+            if self.servo_config_data['updated']:
+                self.servo_center_var.set(str(self.servo_config_data['center']))
+                self.servo_range_var.set(str(self.servo_config_data['range']))
+                self.servo_direction_var.set(self.servo_config_data['direction'])
+
+                # Update servo display
+                center = self.servo_config_data['center']
+                range_val = self.servo_config_data['range']
+                direction = self.servo_config_data['direction']
+                config_text = f"Config: Center={center}μs Range={range_val}μs Dir={direction}"
+                self.servo_config_var.set(config_text)
+
+                # Reset update flag
+                self.servo_config_data['updated'] = False
+
         self.parent.after(0, update_displays)
+
+    def _update_servo_config_display(self):
+        """Update servo configuration display (called by user input)."""
+        center = self.servo_center_var.get()
+        range_val = self.servo_range_var.get()
+        direction = self.servo_direction_var.get()
+        config_text = f"Config: Center={center}μs Range={range_val}μs Dir={direction}"
+        self.servo_config_var.set(config_text)
         
     def get_frame(self):
         """Get the main tab frame."""

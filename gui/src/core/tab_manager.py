@@ -34,9 +34,19 @@ class TabManager:
             ],
             ApplicationType.GPS_AUTOPILOT: [
                 r'GpsAutopilot.*initialized',
+                r'GPS Status Report',
                 r'Navigation.*datum.*set',
                 r'Control.*autonomous.*mode',
-                r'GPS.*fix.*acquired'
+                r'GPS.*fix.*acquired',
+                r'Fix Status:.*\[OK\]',
+                r'Satellites:.*\d+.*tracked',
+                r'Position:.*\d+\.\d+.*°',
+                r'NMEA Sentences:.*\d+',
+                r'\[GPS_RAW\]',
+                r'\[GPS_PARSE\]',
+                r'GPS.*ready.*for.*datum',
+                r'System.*ready.*GPS.*acquiring',
+                r'NAV.*Navigation.*system'
             ],
             ApplicationType.DEVICE_TEST: [
                 r'Device.*Test.*Suite',

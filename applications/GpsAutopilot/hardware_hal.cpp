@@ -12,7 +12,6 @@
 extern Servo rollServo;
 extern Servo motorServo;
 extern Adafruit_NeoPixel pixel;
-extern SoftwareSerial gpsSerial;
 
 // HAL state variables
 static HAL_Config_t halConfig;
@@ -63,8 +62,8 @@ void HAL_Init() {
 uint32_t HAL_ReadGPS(uint8_t* buffer, uint32_t maxBytes) {
   uint32_t bytesRead = 0;
 
-  while (gpsSerial.available() && bytesRead < maxBytes - 1) {
-    buffer[bytesRead] = gpsSerial.read();
+  while (Serial1.available() && bytesRead < maxBytes - 1) {
+    buffer[bytesRead] = Serial1.read();
     bytesRead++;
   }
 
@@ -73,12 +72,12 @@ uint32_t HAL_ReadGPS(uint8_t* buffer, uint32_t maxBytes) {
 }
 
 bool HAL_GPSAvailable() {
-  return gpsSerial.available() > 0;
+  return Serial1.available() > 0;
 }
 
 char HAL_ReadGPSChar() {
-  if (gpsSerial.available()) {
-    return gpsSerial.read();
+  if (Serial1.available()) {
+    return Serial1.read();
   }
   return 0;
 }
@@ -94,6 +93,41 @@ void HAL_SetServoPosition(float rollCommand) {
   microseconds = constrain(microseconds, halConfig.servoMinPulse, halConfig.servoMaxPulse);
 
   rollServo.writeMicroseconds(microseconds);
+}
+
+void HAL_SetRollServo(float rollCommand, const ActuatorParams_t* params) {
+  // Apply direction reversal
+  float adjustedCommand = params->RollServoReversed ? -rollCommand : rollCommand;
+
+  // Constrain command to valid range
+  adjustedCommand = constrain(adjustedCommand, -1.0, 1.0);
+
+  // Convert roll command (-1.0 to +1.0) to pulse width
+  float pulseWidth = params->RollServoCenter +
+                    (adjustedCommand * params->RollServoRange / 2.0);
+
+  // Apply safety limits
+  pulseWidth = constrain(pulseWidth,
+                        params->RollServoMinPulse,
+                        params->RollServoMaxPulse);
+
+  // Apply deadband around center
+  float centerDiff = fabs(pulseWidth - params->RollServoCenter);
+  if (centerDiff < params->RollServoDeadband) {
+    pulseWidth = params->RollServoCenter;
+  }
+
+  // Output to servo
+  rollServo.writeMicroseconds((int)pulseWidth);
+
+#ifdef DEBUG_SERVO
+  Serial.print(F("[SERVO] Cmd: "));
+  Serial.print(rollCommand);
+  Serial.print(F(" Adj: "));
+  Serial.print(adjustedCommand);
+  Serial.print(F(" Pulse: "));
+  Serial.println(pulseWidth);
+#endif
 }
 
 void HAL_SetMotorSpeed(float throttleCommand) {
@@ -189,10 +223,9 @@ void HAL_DelayMilliseconds(uint32_t milliseconds) {
 
 // System information functions
 uint32_t HAL_GetFreeMemory() {
-  // ARM Cortex-M0+ free memory estimation
-  extern char _end;
-  extern char __stack;
-  return (uint32_t)&__stack - (uint32_t)&_end;
+  // Simple free memory estimation for SAMD21
+  // Return a reasonable estimate since exact calculation requires platform-specific code
+  return 16384; // SAMD21 has 32KB RAM, estimate ~16KB available
 }
 
 float HAL_GetCPUUsage() {
@@ -230,11 +263,11 @@ void HAL_SetConfig(const HAL_Config_t* config) {
 
   // Apply configuration changes
   if (config->gpsBaudRate == 1) {
-    gpsSerial.begin(19200);
+    Serial1.begin(19200);
   } else if (config->gpsBaudRate == 2) {
-    gpsSerial.begin(38400);
+    Serial1.begin(38400);
   } else {
-    gpsSerial.begin(9600);
+    Serial1.begin(9600);
   }
 
   Serial.println(F("[HAL] Configuration updated"));

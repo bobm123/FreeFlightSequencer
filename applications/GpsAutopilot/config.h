@@ -36,12 +36,19 @@ typedef struct {
 
 // Actuator parameters structure
 typedef struct {
-    float ServoCenter;    // Servo center position (us) (1400-1600)
-    float ServoRange;     // Servo range (us) (300-600)
-    float ServoRate;      // Maximum servo rate (deg/s) (60-180)
-    float MotorMin;       // Minimum motor speed (%) (0-20)
-    float MotorMax;       // Maximum motor speed (%) (80-100)
-    uint32_t nMotorType;  // Motor type: 0=DC, 1=ESC
+    // Roll servo configuration
+    float RollServoCenter;     // Center position (us) (1400-1600)
+    float RollServoRange;      // Total range (us) (300-600)
+    float RollServoRate;       // Maximum servo rate (deg/s) (60-180)
+    bool RollServoReversed;    // Direction: false=Normal, true=Inverted
+    float RollServoMinPulse;   // Minimum pulse width (us) (800-1200)
+    float RollServoMaxPulse;   // Maximum pulse width (us) (1800-2200)
+    float RollServoDeadband;   // Center deadband (us) (5-20)
+
+    // Motor configuration
+    float MotorMin;            // Minimum motor speed (%) (0-20)
+    float MotorMax;            // Maximum motor speed (%) (80-100)
+    uint32_t nMotorType;       // Motor type: 0=DC, 1=ESC
 } ActuatorParams_t;
 
 // Navigation state structure
@@ -95,10 +102,16 @@ typedef struct {
     uint32_t lastUpdate; // Last control update time (ms)
 } ControlState_t;
 
-// System constants
+// System constants (only define if not already defined by Arduino core)
+#ifndef PI
 #define PI 3.14159265358979323846
+#endif
+#ifndef RAD_TO_DEG
 #define RAD_TO_DEG (180.0 / PI)
+#endif
+#ifndef DEG_TO_RAD
 #define DEG_TO_RAD (PI / 180.0)
+#endif
 
 // Earth constants for GPS calculations
 #define EARTH_RADIUS_M 6371000.0  // Earth radius in meters

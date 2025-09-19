@@ -51,6 +51,7 @@ bool Coms_UpdateActuatorParams(const ActuatorParams_t* params);
 
 // Serial interface functions
 void Coms_ProcessSerialCommand();
+void Coms_ProcessServoCommand(const String& command);
 void Coms_SendStatus();
 void Coms_SendParameters();
 
