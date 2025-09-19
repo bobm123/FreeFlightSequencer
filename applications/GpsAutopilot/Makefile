@@ -25,9 +25,10 @@ $(BUILD_DIR)/$(SKETCH).bin: $(SKETCH) $(SOURCES) *.h
 upload: $(BUILD_DIR)/$(SKETCH).bin
 	arduino-cli upload --fqbn $(BOARD) --port $(ARDUINO_PORT) --input-dir $(BUILD_DIR) $(SKETCH)
 
-# Clean build artifacts (cross-platform)
+# Clean build artifacts
+#	rm -rf $(BUILD_DIR)
+#	rm -f *.hex *.elf
 clean:
-	-rm -rf $(BUILD_DIR)
-	-rm -f *.hex *.elf
+	del /Q $(BUILD_DIR)
 
 .PHONY: all compile upload clean

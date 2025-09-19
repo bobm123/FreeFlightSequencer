@@ -107,7 +107,11 @@ const FlightParameters DEFAULT_PARAMS = {
     10.0,     // RollServoDeadband - Center deadband (us) (5-20)
     10.0,     // MotorMin - Minimum motor speed (%) (0-20)
     80.0,     // MotorMax - Maximum motor speed (%) (80-100)
-    1         // nMotorType - Motor type: 0=DC, 1=ESC
+    1,        // nMotorType - Motor type: 0=DC, 1=ESC
+    0.3,      // FailsafeRollCommand - Gentle left turn when GPS lost
+    0.6,      // FailsafeMotorCommand - 60% power during failsafe
+    10000,    // GpsTimeoutMs - 10 second GPS timeout
+    true      // FailsafeCircleLeft - Circle left during GPS loss
   },
   true        // valid flag
 };
@@ -158,10 +162,18 @@ enum LedPattern {
   LED_GPS_SEARCHING
 };
 
+// GPS data flash management
+static unsigned long lastGpsFlash = 0;
+static bool gpsFlashActive = false;
+static uint8_t currentRed = 0, currentGreen = 0, currentBlue = 0;
+
 // Function prototypes
 void initializeSystem();
 void updateButtonState();
 void updateLED(LedPattern pattern, unsigned long currentTime);
+void triggerGpsDataFlash();
+void updateGpsDataFlash(unsigned long currentTime);
+void reportGpsStatus();
 FlightState executeReadyState(FlightState currentState);
 FlightState executeArmedState(FlightState currentState);
 FlightState executeMotorSpoolState(FlightState currentState);
@@ -221,7 +233,10 @@ void loop() {
   // Update GPS data
   if (Serial1.available()) {
     // Process incoming GPS data
-    Nav_UpdateGPS(&navState);
+    bool dataProcessed = Nav_UpdateGPS(&navState);
+    if (dataProcessed) {
+      triggerGpsDataFlash(); // Blue flash when GPS data processed
+    }
   }
 
   // Validate GPS status (should be called regularly, not just when data arrives)
@@ -236,6 +251,9 @@ void loop() {
       Serial.println(F("[DEBUG] GPS became invalid"));
     }
   }
+
+  // Update GPS data flash overlay
+  updateGpsDataFlash(currentTime);
 
   // Execute current flight state
   switch (flightState) {
@@ -272,6 +290,13 @@ void loop() {
 
   // Update communications
   Coms_Step();
+
+  // Periodic GPS status reporting for GUI
+  static unsigned long lastGpsReport = 0;
+  if (currentTime - lastGpsReport > 2000) { // Every 2 seconds
+    reportGpsStatus();
+    lastGpsReport = currentTime;
+  }
 
   // Small delay for system stability
   delay(20); // 50Hz main loop
@@ -460,9 +485,46 @@ FlightState executeGpsGuidedFlightState(FlightState currentState) {
       return STATE_EMERGENCY;
     }
   } else {
-    // GPS lost - emergency mode
-    Serial.println(F("[WARN] GPS signal lost - emergency mode"));
-    return STATE_EMERGENCY;
+    // GPS lost - enter failsafe mode
+    static unsigned long gpsLossTime = 0;
+    if (gpsLossTime == 0) {
+      gpsLossTime = millis();
+      Serial.println(F("[WARN] GPS signal lost - entering failsafe mode"));
+    }
+
+    // Apply failsafe commands (gentle turn + reduced power)
+    float failsafeRoll = currentParams.actuator.FailsafeRollCommand;
+    if (!currentParams.actuator.FailsafeCircleLeft) {
+      failsafeRoll = -failsafeRoll; // Reverse for right turn
+    }
+
+    // Convert failsafe roll command to servo position
+    int rollPWM = currentParams.actuator.RollServoCenter +
+                  failsafeRoll * currentParams.actuator.RollServoRange / 2.0;
+    rollPWM = constrain(rollPWM,
+                       currentParams.actuator.RollServoCenter - currentParams.actuator.RollServoRange/2,
+                       currentParams.actuator.RollServoCenter + currentParams.actuator.RollServoRange/2);
+
+    // Convert failsafe motor command to ESC signal
+    int motorPWM = 1000 + currentParams.actuator.FailsafeMotorCommand * 1000;
+    motorPWM = constrain(motorPWM, 1000, 2000);
+
+    // Apply failsafe commands
+    rollServo.writeMicroseconds(rollPWM);
+    motorServo.writeMicroseconds(motorPWM);
+
+    // Check GPS timeout - go to emergency if GPS lost too long
+    if (millis() - gpsLossTime > currentParams.actuator.GpsTimeoutMs) {
+      Serial.println(F("[WARN] GPS timeout exceeded - emergency mode"));
+      gpsLossTime = 0; // Reset for next time
+      return STATE_EMERGENCY;
+    }
+
+    // Reset GPS loss timer when GPS comes back
+    if (gpsValid) {
+      gpsLossTime = 0;
+      Serial.println(F("[INFO] GPS signal recovered"));
+    }
   }
 
   return currentState; // Stay in GPS Guided Flight State
@@ -566,13 +628,11 @@ void updateLED(LedPattern pattern, unsigned long currentTime) {
 
   switch (pattern) {
     case LED_OFF:
-      pixel.setPixelColor(0, pixel.Color(0, 0, 0));
-      pixel.show();
+      setLEDColor(0, 0, 0);
       break;
 
     case LED_SOLID_RED:
-      pixel.setPixelColor(0, pixel.Color(255, 0, 0));
-      pixel.show();
+      setLEDColor(255, 0, 0);
       break;
 
     case LED_HEARTBEAT: {
@@ -580,33 +640,29 @@ void updateLED(LedPattern pattern, unsigned long currentTime) {
       switch (step) {
         case 0:
           if (currentTime - lastChange >= 0) {
-            pixel.setPixelColor(0, pixel.Color(255, 0, 0));
-            pixel.show();
-            lastChange = currentTime;
+            setLEDColor(255, 0, 0);
+                lastChange = currentTime;
             step = 1;
           }
           break;
         case 1:
           if (currentTime - lastChange >= 50) {
-            pixel.setPixelColor(0, pixel.Color(0, 0, 0));
-            pixel.show();
-            lastChange = currentTime;
+            setLEDColor(0, 0, 0);
+                lastChange = currentTime;
             step = 2;
           }
           break;
         case 2:
           if (currentTime - lastChange >= 100) {
-            pixel.setPixelColor(0, pixel.Color(255, 0, 0));
-            pixel.show();
-            lastChange = currentTime;
+            setLEDColor(255, 0, 0);
+                lastChange = currentTime;
             step = 3;
           }
           break;
         case 3:
           if (currentTime - lastChange >= 50) {
-            pixel.setPixelColor(0, pixel.Color(0, 0, 0));
-            pixel.show();
-            lastChange = currentTime;
+            setLEDColor(0, 0, 0);
+                lastChange = currentTime;
             step = 4;
           }
           break;
@@ -623,11 +679,10 @@ void updateLED(LedPattern pattern, unsigned long currentTime) {
       // 100ms on/off cycle
       if (currentTime - lastChange >= 100) {
         if (ledState) {
-          pixel.setPixelColor(0, pixel.Color(0, 0, 0));
+          setLEDColor(0, 0, 0);
         } else {
-          pixel.setPixelColor(0, pixel.Color(255, 0, 0));
+          setLEDColor(255, 0, 0);
         }
-        pixel.show();
         ledState = !ledState;
         lastChange = currentTime;
       }
@@ -637,11 +692,10 @@ void updateLED(LedPattern pattern, unsigned long currentTime) {
       // 500ms on/off cycle
       if (currentTime - lastChange >= 500) {
         if (ledState) {
-          pixel.setPixelColor(0, pixel.Color(0, 0, 0));
+          setLEDColor(0, 0, 0);
         } else {
-          pixel.setPixelColor(0, pixel.Color(255, 0, 0));
+          setLEDColor(255, 0, 0);
         }
-        pixel.show();
         ledState = !ledState;
         lastChange = currentTime;
       }
@@ -651,11 +705,10 @@ void updateLED(LedPattern pattern, unsigned long currentTime) {
       // Very fast 200ms on/off cycle for emergency
       if (currentTime - lastChange >= 200) {
         if (ledState) {
-          pixel.setPixelColor(0, pixel.Color(0, 0, 0));
+          setLEDColor(0, 0, 0);
         } else {
-          pixel.setPixelColor(0, pixel.Color(255, 0, 0));
+          setLEDColor(255, 0, 0);
         }
-        pixel.show();
         ledState = !ledState;
         lastChange = currentTime;
       }
@@ -665,11 +718,10 @@ void updateLED(LedPattern pattern, unsigned long currentTime) {
       // Orange/yellow color with 750ms on/off cycle for GPS searching
       if (currentTime - lastChange >= 750) {
         if (ledState) {
-          pixel.setPixelColor(0, pixel.Color(0, 0, 0));
+          setLEDColor(0, 0, 0);
         } else {
-          pixel.setPixelColor(0, pixel.Color(255, 165, 0)); // Orange color
+          setLEDColor(255, 165, 0); // Orange color
         }
-        pixel.show();
         ledState = !ledState;
         lastChange = currentTime;
       }
@@ -678,17 +730,111 @@ void updateLED(LedPattern pattern, unsigned long currentTime) {
     case LED_LANDING_BLINK:
       // 50ms on, 2950ms off cycle
       if (!ledState && currentTime - lastChange >= 50) {
-        pixel.setPixelColor(0, pixel.Color(255, 0, 0));
-        pixel.show();
+        setLEDColor(255, 0, 0);
         ledState = true;
         lastChange = currentTime;
       } else if (ledState && currentTime - lastChange >= 2950) {
-        pixel.setPixelColor(0, pixel.Color(0, 0, 0));
-        pixel.show();
+        setLEDColor(0, 0, 0);
         ledState = false;
         lastChange = currentTime;
       }
       break;
+  }
+}
+
+// GPS data flash functions for dual LED operation
+void triggerGpsDataFlash() {
+  lastGpsFlash = millis();
+  gpsFlashActive = true;
+}
+
+void updateGpsDataFlash(unsigned long currentTime) {
+  // Blue flash duration: 50ms on, then off
+  if (gpsFlashActive) {
+    if (currentTime - lastGpsFlash < 50) {
+      // Add blue component to current LED color
+      pixel.setPixelColor(0, pixel.Color(currentRed, currentGreen, currentBlue + 150));
+      pixel.show();
+    } else {
+      // Flash ended, restore original color
+      gpsFlashActive = false;
+      pixel.setPixelColor(0, pixel.Color(currentRed, currentGreen, currentBlue));
+      pixel.show();
+    }
+  }
+}
+
+// Helper function to set LED color and store current values
+void setLEDColor(uint8_t red, uint8_t green, uint8_t blue) {
+  currentRed = red;
+  currentGreen = green;
+  currentBlue = blue;
+
+  // Apply GPS flash overlay if active
+  uint8_t finalBlue = blue;
+  if (gpsFlashActive && (millis() - lastGpsFlash < 50)) {
+    finalBlue = min(255, blue + 150);
+  }
+
+  pixel.setPixelColor(0, pixel.Color(red, green, finalBlue));
+  pixel.show();
+}
+
+// GPS status reporting for GUI parsing
+void reportGpsStatus() {
+  if (gpsValid) {
+    // Report GPS fix status in format GUI expects
+    Serial.print(F("Fix Status: [OK] 3D Fix, Satellites: "));
+    Serial.print(5); // Placeholder - could get actual satellite count from navState
+    Serial.println(F(" tracked"));
+
+    // Report position - absolute coordinates before datum, relative after
+    if (datumSet) {
+      // Show relative position after datum is set
+      Serial.print(F("Position: N="));
+      Serial.print(navState.north, 1);
+      Serial.print(F(" E="));
+      Serial.print(navState.east, 1);
+      Serial.print(F(" U="));
+      Serial.print(navState.altitude, 1);
+      Serial.println();
+
+      Serial.print(F("Range: "));
+      Serial.print(navState.rangeFromDatum, 1);
+      Serial.print(F("m, Bearing: "));
+      Serial.print(navState.bearingToDatum * 180.0 / PI, 0);
+      Serial.println(F("deg"));
+    } else {
+      // Show absolute GPS coordinates before datum is set
+      Serial.print(F("Position: "));
+      Serial.print(navState.datumLat, 6);
+      Serial.print(F("°, "));
+      Serial.print(navState.datumLon, 6);
+      Serial.print(F("°, Alt: "));
+      Serial.print(navState.altitude, 1);
+      Serial.println(F("m"));
+    }
+
+    // Report flight mode and navigation mode
+    Serial.print(F("Flight Mode: "));
+    switch(flightState) {
+      case STATE_READY: Serial.println(F("READY")); break;
+      case STATE_ARMED: Serial.println(F("ARMED")); break;
+      case STATE_MOTOR_SPOOL: Serial.println(F("MOTOR_SPOOL")); break;
+      case STATE_GPS_GUIDED_FLIGHT: Serial.println(F("AUTONOMOUS")); break;
+      case STATE_EMERGENCY: Serial.println(F("EMERGENCY")); break;
+      case STATE_LANDING: Serial.println(F("LANDING")); break;
+      default: Serial.println(F("UNKNOWN")); break;
+    }
+
+    Serial.print(F("Nav Mode: "));
+    if (datumSet) {
+      Serial.println(F("GPS_ORBIT"));
+    } else {
+      Serial.println(F("GPS_ACQUIRE"));
+    }
+  } else {
+    Serial.println(F("GPS: No Fix"));
   }
 }
 

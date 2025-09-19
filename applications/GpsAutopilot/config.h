@@ -49,6 +49,12 @@ typedef struct {
     float MotorMin;            // Minimum motor speed (%) (0-20)
     float MotorMax;            // Maximum motor speed (%) (80-100)
     uint32_t nMotorType;       // Motor type: 0=DC, 1=ESC
+
+    // GPS Failsafe settings
+    float FailsafeRollCommand; // Roll command when GPS lost (-1.0 to +1.0)
+    float FailsafeMotorCommand; // Motor command when GPS lost (0.0 to 1.0)
+    uint32_t GpsTimeoutMs;     // GPS timeout before failsafe (ms) (5000-30000)
+    bool FailsafeCircleLeft;   // Circle direction: true=Left, false=Right
 } ActuatorParams_t;
 
 // Navigation state structure

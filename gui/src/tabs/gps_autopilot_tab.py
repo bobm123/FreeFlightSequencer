@@ -510,12 +510,25 @@ class GpsAutopilotTab:
                 sat_count = sat_match.group(1) if sat_match.group(1) else sat_match.group(2)
                 self.nav_data['satellites'] = int(sat_count)
 
-            # Position data (N/E/U format)
+            # Position data - handle both relative (N/E/U) and absolute (lat/lon) formats
             pos_match = re.search(r'pos.*?n[=:]?([-+]?\d*\.?\d+).*?e[=:]?([-+]?\d*\.?\d+).*?u[=:]?([-+]?\d*\.?\d+)', data, re.IGNORECASE)
             if pos_match:
                 self.nav_data['position_n'] = float(pos_match.group(1))
                 self.nav_data['position_e'] = float(pos_match.group(2))
                 self.nav_data['position_u'] = float(pos_match.group(3))
+            else:
+                # Try absolute coordinate format: Position: 39.246645°, -77.196397°, Alt: 180.6m
+                abs_pos_match = re.search(r'Position:\s*([-+]?\d+\.\d+)°,\s*([-+]?\d+\.\d+)°,\s*Alt:\s*(\d+\.\d+)m', data)
+                if abs_pos_match:
+                    # Store absolute coordinates in position fields for display
+                    lat = float(abs_pos_match.group(1))
+                    lon = float(abs_pos_match.group(2))
+                    alt = float(abs_pos_match.group(3))
+
+                    # Convert to display format (use lat/lon as N/E for now)
+                    self.nav_data['position_n'] = lat
+                    self.nav_data['position_e'] = lon
+                    self.nav_data['position_u'] = alt
 
             # Range and bearing
             range_match = re.search(r'range.*?(\d*\.?\d+)', data, re.IGNORECASE)
