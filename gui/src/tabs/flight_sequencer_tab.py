@@ -3,11 +3,13 @@ FlightSequencer Tab - Enhanced interface for FlightSequencer control.
 Refactored from original simple_gui.py with additional features.
 """
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
+from tkinter import ttk, messagebox, simpledialog, filedialog
 import re
 import json
 import os
 import sys
+import csv
+from datetime import datetime
 from typing import Dict, Any
 
 # Add src directory to path
@@ -28,7 +30,12 @@ class FlightSequencerTab:
         self.serial_monitor = serial_monitor
         self.tab_manager = tab_manager
         self.param_monitor = ParameterMonitor()
-        
+
+        # Flight data management
+        self.flight_data_buffer = ""
+        self.downloading_data = False
+        self.last_flight_data = None
+
         # Create main tab frame
         self.frame = ttk.Frame(parent)
         
@@ -62,6 +69,7 @@ class FlightSequencerTab:
         
         # Create control panels
         self._create_flight_controls(left_frame)
+        self._create_flight_data_controls(left_frame)
         self._create_status_display(left_frame)
         
         # Serial monitor
@@ -132,7 +140,33 @@ class FlightSequencerTab:
                   command=self._reset_parameters).pack(side='left', padx=2)
         ttk.Button(action_frame, text="Emergency Stop", 
                   command=self._emergency_stop).pack(side='right', padx=2)
-                  
+
+    def _create_flight_data_controls(self, parent):
+        """Create flight data download and management controls."""
+        data_frame = ttk.LabelFrame(parent, text="Flight Data Management")
+        data_frame.pack(fill='x', padx=5, pady=5)
+
+        # Flight records status
+        status_frame = ttk.Frame(data_frame)
+        status_frame.pack(fill='x', padx=5, pady=2)
+
+        self.records_status_var = tk.StringVar(value="Records: Unknown")
+        ttk.Label(status_frame, textvariable=self.records_status_var).pack(side='left')
+
+        self.gps_status_var = tk.StringVar(value="GPS: Unknown")
+        ttk.Label(status_frame, textvariable=self.gps_status_var).pack(side='right')
+
+        # Download controls
+        download_frame = ttk.Frame(data_frame)
+        download_frame.pack(fill='x', padx=5, pady=2)
+
+        ttk.Button(download_frame, text="Download Flight Data",
+                  command=self._download_flight_data).pack(side='left', padx=2)
+        ttk.Button(download_frame, text="Clear Records",
+                  command=self._clear_flight_records).pack(side='left', padx=2)
+        ttk.Button(download_frame, text="View Flight Path",
+                  command=self._view_flight_path).pack(side='right', padx=2)
+
     def _create_status_display(self, parent):
         """Create flight status display."""
         status_frame = ttk.LabelFrame(parent, text="Flight Status")
@@ -298,7 +332,10 @@ class FlightSequencerTab:
         
         # Update flight status
         self._update_flight_status(data)
-        
+
+        # Handle flight data download
+        self._handle_flight_data_response(data)
+
     def _update_current_params(self):
         """Update the current parameters display."""
         def update_params():
@@ -343,6 +380,292 @@ class FlightSequencerTab:
             count = flight_match.group(1)
             self.flights_completed_var.set(f"Flights: {count}")
             
+    def _download_flight_data(self):
+        """Download flight records from Arduino."""
+        if not self.serial_monitor or not self.serial_monitor.is_connected:
+            messagebox.showwarning("Not Connected", "Please connect to Arduino first")
+            return
+
+        # Show progress dialog
+        progress_window = tk.Toplevel(self.parent)
+        progress_window.title("Downloading Flight Data")
+        progress_window.geometry("300x100")
+        progress_window.grab_set()  # Make it modal
+
+        ttk.Label(progress_window, text="Downloading flight records...").pack(pady=10)
+        progress = ttk.Progressbar(progress_window, mode='indeterminate')
+        progress.pack(padx=20, pady=10, fill='x')
+        progress.start()
+
+        # Start download
+        self.flight_data_buffer = ""
+        self.downloading_data = True
+        self.progress_window = progress_window
+        self._send_command("D J")  # Request JSON format
+
+        # Set timeout for download
+        self.parent.after(10000, lambda: self._download_timeout())
+
+    def _download_timeout(self):
+        """Handle download timeout."""
+        if self.downloading_data:
+            self.downloading_data = False
+            if hasattr(self, 'progress_window'):
+                self.progress_window.destroy()
+            messagebox.showerror("Timeout", "Download timed out. Please try again.")
+
+    def _clear_flight_records(self):
+        """Clear flight records on Arduino."""
+        if messagebox.askyesno("Clear Records",
+                              "Clear all flight records from Arduino?"):
+            self._send_command("X")
+            self.records_status_var.set("Records: Cleared")
+
+    def _view_flight_path(self):
+        """Open flight path visualization window."""
+        if not hasattr(self, 'last_flight_data') or not self.last_flight_data:
+            messagebox.showinfo("No Data", "No flight data available. Download flight data first.")
+            return
+
+        self._create_flight_path_window()
+
+    def _handle_flight_data_response(self, data):
+        """Handle flight data download response."""
+        if not self.downloading_data:
+            # Update GPS status from help command responses
+            if "GPS Status:" in data:
+                if "Available" in data:
+                    # Extract position count
+                    import re
+                    match = re.search(r'\((\d+) positions recorded\)', data)
+                    if match:
+                        count = match.group(1)
+                        self.gps_status_var.set(f"GPS: Available")
+                        self.records_status_var.set(f"Records: {count} positions")
+                    else:
+                        self.gps_status_var.set("GPS: Available")
+                elif "Not detected" in data:
+                    self.gps_status_var.set("GPS: Not detected")
+                    self.records_status_var.set("Records: N/A (No GPS)")
+            return
+
+        # Collect data until END marker
+        self.flight_data_buffer += data + "\n"
+
+        if "[END_FLIGHT_DATA]" in data:
+            self.downloading_data = False
+            if hasattr(self, 'progress_window'):
+                self.progress_window.destroy()
+            self._process_downloaded_data()
+
+    def _process_downloaded_data(self):
+        """Process and save downloaded flight data."""
+        try:
+            # Extract JSON from buffer
+            json_start = self.flight_data_buffer.find("{")
+            json_end = self.flight_data_buffer.rfind("}") + 1
+
+            if json_start >= 0 and json_end > json_start:
+                flight_data = json.loads(self.flight_data_buffer[json_start:json_end])
+                self.last_flight_data = flight_data
+
+                # Save to file
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"flight_data_{timestamp}.json"
+
+                file_path = filedialog.asksaveasfilename(
+                    defaultextension=".json",
+                    filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+                    initialname=filename
+                )
+
+                if file_path:
+                    with open(file_path, 'w') as f:
+                        json.dump(flight_data, f, indent=2)
+
+                    messagebox.showinfo("Success", f"Flight data saved to:\n{file_path}")
+
+                    # Update status
+                    position_count = len(flight_data.get('position_records', []))
+                    self.records_status_var.set(f"Records: {position_count} positions")
+                    if position_count > 0:
+                        self.gps_status_var.set("GPS: Data downloaded")
+            else:
+                messagebox.showwarning("No Data", "No valid flight data received from Arduino")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to process flight data:\n{str(e)}")
+
+    def _create_flight_path_window(self):
+        """Create flight path visualization window."""
+        try:
+            import matplotlib.pyplot as plt
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+            import numpy as np
+        except ImportError:
+            messagebox.showerror("Missing Package",
+                               "matplotlib is required for flight path visualization.\n"
+                               "Install with: pip install matplotlib")
+            return
+
+        # Create visualization window
+        viz_window = tk.Toplevel(self.parent)
+        viz_window.title("Flight Path Visualization")
+        viz_window.geometry("800x600")
+
+        # Create matplotlib figure
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+
+        # Parse flight data
+        positions = self.last_flight_data.get('position_records', [])
+        if not positions:
+            ttk.Label(viz_window, text="No position data available").pack()
+            return
+
+        # Extract data arrays
+        times = [p['timestamp_ms'] / 1000.0 for p in positions]  # Convert to seconds
+        lats = [p['latitude'] for p in positions]
+        lons = [p['longitude'] for p in positions]
+        states = [p['flight_state'] for p in positions]
+        state_names = [p['state_name'] for p in positions]
+
+        # Plot 1: Flight path map
+        scatter = ax1.scatter(lons, lats, c=times, cmap='viridis', s=50)
+        ax1.plot(lons, lats, 'b-', alpha=0.6, linewidth=2)
+        ax1.set_xlabel('Longitude')
+        ax1.set_ylabel('Latitude')
+        ax1.set_title('GPS Flight Path')
+        ax1.grid(True, alpha=0.3)
+
+        # Add colorbar for time
+        plt.colorbar(scatter, ax=ax1, label='Time (seconds)')
+
+        # Add state markers
+        state_colors = {3: 'red', 4: 'orange', 5: 'green', 6: 'purple'}
+        state_labels = {3: 'Spool', 4: 'Motor', 5: 'Glide', 6: 'DT Deploy'}
+
+        for state in state_colors:
+            state_positions = [(lon, lat) for lon, lat, s in zip(lons, lats, states) if s == state]
+            if state_positions:
+                state_lons, state_lats = zip(*state_positions)
+                ax1.scatter(state_lons, state_lats, c=state_colors[state],
+                           s=100, alpha=0.7, marker='s', label=state_labels[state])
+
+        ax1.legend()
+
+        # Plot 2: Timeline
+        ax2.plot(times, states, 'b-', linewidth=2, marker='o')
+        ax2.set_xlabel('Time (seconds)')
+        ax2.set_ylabel('Flight State')
+        ax2.set_title('Flight State Timeline')
+        ax2.grid(True, alpha=0.3)
+        ax2.set_yticks([1, 2, 3, 4, 5, 6, 99])
+        ax2.set_yticklabels(['Ready', 'Armed', 'Spool', 'Motor', 'Glide', 'DT', 'Land'])
+
+        plt.tight_layout()
+
+        # Embed in tkinter
+        canvas = FigureCanvasTkAgg(fig, viz_window)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill='both', expand=True)
+
+        # Add export button frame
+        export_frame = ttk.Frame(viz_window)
+        export_frame.pack(fill='x', padx=5, pady=5)
+
+        ttk.Button(export_frame, text="Export CSV",
+                  command=lambda: self._export_csv()).pack(side='left', padx=5)
+        ttk.Button(export_frame, text="Export KML",
+                  command=lambda: self._export_kml()).pack(side='left', padx=5)
+        ttk.Button(export_frame, text="Close",
+                  command=viz_window.destroy).pack(side='right', padx=5)
+
+    def _export_csv(self):
+        """Export flight data to CSV format."""
+        if not hasattr(self, 'last_flight_data') or not self.last_flight_data:
+            messagebox.showwarning("No Data", "No flight data to export")
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"flight_path_{timestamp}.csv"
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialname=filename
+        )
+
+        if file_path:
+            positions = self.last_flight_data.get('position_records', [])
+
+            with open(file_path, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(['Time_Seconds', 'Flight_State', 'State_Name',
+                               'Latitude', 'Longitude'])
+
+                for pos in positions:
+                    writer.writerow([
+                        pos['timestamp_ms'] / 1000.0,
+                        pos['flight_state'],
+                        pos['state_name'],
+                        pos['latitude'],
+                        pos['longitude']
+                    ])
+
+            messagebox.showinfo("Success", f"CSV exported to:\n{file_path}")
+
+    def _export_kml(self):
+        """Export flight path to KML for Google Earth."""
+        if not hasattr(self, 'last_flight_data') or not self.last_flight_data:
+            messagebox.showwarning("No Data", "No flight data to export")
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"flight_path_{timestamp}.kml"
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".kml",
+            filetypes=[("KML files", "*.kml"), ("All files", "*.*")],
+            initialname=filename
+        )
+
+        if file_path:
+            positions = self.last_flight_data.get('position_records', [])
+
+            kml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Flight Path {timestamp}</name>
+    <description>FlightSequencer GPS Track</description>
+
+    <Style id="flightPath">
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>3</width>
+      </LineStyle>
+    </Style>
+
+    <Placemark>
+      <name>Flight Path</name>
+      <styleUrl>#flightPath</styleUrl>
+      <LineString>
+        <coordinates>
+"""
+
+            for pos in positions:
+                kml_content += f"          {pos['longitude']},{pos['latitude']},0\n"
+
+            kml_content += """        </coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>"""
+
+            with open(file_path, 'w') as f:
+                f.write(kml_content)
+
+            messagebox.showinfo("Success", f"KML exported to:\n{file_path}")
+
     def get_frame(self):
         """Get the main tab frame."""
         return self.frame

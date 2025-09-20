@@ -1,2 +1,3 @@
 # Phase 1 Core Communication Dependencies
 pyserial>=3.5
+matplotlib>=3.5.0

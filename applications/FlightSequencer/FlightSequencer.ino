@@ -43,6 +43,15 @@ Servo motorServo;
 // NeoPixel LED
 Adafruit_NeoPixel pixel(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
+// GPS position recording structure
+struct GPSPosition {
+  float latitude;
+  float longitude;
+  unsigned long timestamp;  // Flight time in milliseconds
+  int flightState;
+  bool valid;
+};
+
 // Flight parameter structure for FlashStorage
 struct FlightParameters {
   unsigned short motorRunTime;
@@ -61,6 +70,21 @@ const FlightParameters DEFAULT_PARAMS = {
 
 // Current flight parameters (loaded from FlashStorage or defaults)
 FlightParameters currentParams;
+
+// GPS tracking variables
+bool gpsAvailable = false;
+bool gpsInitialized = false;
+float currentLat = 0.0;
+float currentLon = 0.0;
+int gpsQuality = 0;
+int satelliteCount = 0;
+
+// Position storage (limited by SAMD21 memory)
+const int MAX_GPS_POSITIONS = 100;
+GPSPosition flightPath[MAX_GPS_POSITIONS];
+int positionCount = 0;
+unsigned long lastGPSRecord = 0;
+const unsigned long GPS_RECORD_INTERVAL = 2000; // Record GPS every 2 seconds
 
 // FlashStorage instance
 FlashStorage(flash_store, FlightParameters);
@@ -130,6 +154,15 @@ int executeGlideState(int currentState);
 int executeDTDeployState(int currentState);
 int executeLandingState(int currentState);
 
+// GPS function prototypes
+void detectGPS();
+void processGPSData();
+bool parseNMEASentence(String sentence);
+void recordPosition();
+void clearFlightRecords();
+void downloadFlightRecords(String format);
+const char* getStateName(int state);
+
 // Serial parameter programming functions
 void loadParameters();
 void saveParameters();
@@ -154,10 +187,13 @@ void setup() {
   
   // Load parameters from FlashStorage
   loadParameters();
-  
+
   // Initialize flight timing
   flightStartTime = millis();
-  
+
+  // Detect and initialize GPS
+  detectGPS();
+
   // Initialize hardware
   initializeSystem();
   
@@ -172,7 +208,10 @@ void loop() {
   if (flightState == 1 || flightState == 99) {  // Ready or Landing state
     processSerialCommand();
   }
-  
+
+  // Process GPS data (non-blocking)
+  processGPSData();
+
   // Update button state with press/release detection
   updateButtonState();
   
@@ -319,7 +358,11 @@ void resetStateVariables() {
   spoolStateEntered = false;
   runStateEntered = false;
   dtDeployed = false;
-  
+
+  // Clear GPS flight path for new flight
+  positionCount = 0;
+  lastGPSRecord = 0;
+
   // Serial.println(F("[DEBUG] State variables reset for new flight"));
 }
 
@@ -841,7 +884,20 @@ void processSerialCommand() {
       resetToDefaults();
       break;
     }
-    
+
+    case 'D': {
+      // Download flight records
+      String format = command.length() > 2 ? command.substring(2) : "J";
+      downloadFlightRecords(format);
+      break;
+    }
+
+    case 'X': {
+      // Clear flight records
+      clearFlightRecords();
+      break;
+    }
+
     case '?': {
       // Help
       showHelp();
@@ -891,5 +947,217 @@ void showHelp() {
   Serial.println(F(")"));
   Serial.println(F("[INFO] G         - Get current parameters"));
   Serial.println(F("[INFO] R         - Reset to defaults"));
+  Serial.println(F("[INFO] D [J/C]   - Download flight records (JSON/CSV)"));
+  Serial.println(F("[INFO] X         - Clear flight records"));
   Serial.println(F("[INFO] ?         - Show this help"));
+  if (gpsAvailable) {
+    Serial.print(F("[INFO] GPS Status: Available ("));
+    Serial.print(positionCount);
+    Serial.println(F(" positions recorded)"));
+  } else {
+    Serial.println(F("[INFO] GPS Status: Not detected"));
+  }
+}
+
+// GPS Functions
+
+void detectGPS() {
+  Serial1.begin(9600);
+  delay(100);
+
+  Serial.println(F("[INFO] Detecting GPS module..."));
+
+  unsigned long startTime = millis();
+  while (millis() - startTime < 2000) {  // 2 second detection window
+    if (Serial1.available()) {
+      String line = Serial1.readStringUntil('\n');
+      if (line.startsWith("$GN") || line.startsWith("$GP")) {
+        gpsAvailable = true;
+        Serial.println(F("[INFO] GPS module detected on Serial1"));
+        return;
+      }
+    }
+  }
+  Serial.println(F("[INFO] No GPS detected - continuing without GPS"));
+}
+
+void processGPSData() {
+  if (!gpsAvailable || !Serial1.available()) return;
+
+  String sentence = Serial1.readStringUntil('\n');
+  if (sentence.startsWith("$GNGGA") || sentence.startsWith("$GPGGA")) {
+    if (parseNMEASentence(sentence)) {
+      // Record position during active flight states with timing interval
+      if ((flightState >= 3 && flightState <= 6) &&
+          (millis() - lastGPSRecord > GPS_RECORD_INTERVAL)) {
+        recordPosition();
+        lastGPSRecord = millis();
+      }
+    }
+  }
+}
+
+bool parseNMEASentence(String sentence) {
+  // Parse NMEA GGA sentence: $GPGGA,time,lat,N/S,lon,E/W,quality,satellites,hdop,alt,M,geoid,M,age,station*checksum
+  int commaCount = 0;
+  int startPos = 0;
+  int endPos = 0;
+  String fields[15];
+
+  // Split sentence by commas
+  for (int i = 0; i < sentence.length() && commaCount < 15; i++) {
+    if (sentence.charAt(i) == ',' || i == sentence.length() - 1) {
+      endPos = (sentence.charAt(i) == ',') ? i : i + 1;
+      fields[commaCount] = sentence.substring(startPos, endPos);
+      startPos = endPos + 1;
+      commaCount++;
+    }
+  }
+
+  if (commaCount < 6) return false;
+
+  // Extract GPS quality and satellite count
+  gpsQuality = fields[6].toInt();
+  satelliteCount = fields[7].toInt();
+
+  if (gpsQuality == 0 || fields[2].length() == 0 || fields[4].length() == 0) {
+    return false; // No fix or missing data
+  }
+
+  // Parse latitude (DDMM.MMMMM format)
+  String latStr = fields[2];
+  if (latStr.length() >= 7) {
+    float degrees = latStr.substring(0, 2).toFloat();
+    float minutes = latStr.substring(2).toFloat();
+    currentLat = degrees + (minutes / 60.0);
+    if (fields[3] == "S") currentLat = -currentLat;
+  }
+
+  // Parse longitude (DDDMM.MMMMM format)
+  String lonStr = fields[4];
+  if (lonStr.length() >= 8) {
+    float degrees = lonStr.substring(0, 3).toFloat();
+    float minutes = lonStr.substring(3).toFloat();
+    currentLon = degrees + (minutes / 60.0);
+    if (fields[5] == "W") currentLon = -currentLon;
+  }
+
+  return true;
+}
+
+void recordPosition() {
+  if (positionCount >= MAX_GPS_POSITIONS) return;
+
+  unsigned long flightElapsed = millis() - startTime;
+
+  flightPath[positionCount].latitude = currentLat;
+  flightPath[positionCount].longitude = currentLon;
+  flightPath[positionCount].timestamp = flightElapsed;
+  flightPath[positionCount].flightState = flightState;
+  flightPath[positionCount].valid = true;
+
+  positionCount++;
+}
+
+void clearFlightRecords() {
+  positionCount = 0;
+  Serial.print(F("[OK] Flight records cleared ("));
+  Serial.print(MAX_GPS_POSITIONS);
+  Serial.println(F(" positions available)"));
+}
+
+void downloadFlightRecords(String format) {
+  if (positionCount == 0) {
+    Serial.println(F("[INFO] No flight records available"));
+    if (gpsAvailable) {
+      Serial.println(F("[INFO] GPS detected but no positions recorded"));
+    } else {
+      Serial.println(F("[INFO] GPS not available"));
+    }
+    return;
+  }
+
+  Serial.println(F("[START_FLIGHT_DATA]"));
+
+  if (format == "J" || format == "") {
+    // JSON format
+    Serial.println(F("{"));
+    Serial.println(F("  \"flight_header\": {"));
+    Serial.print(F("    \"flight_id\": \"F_"));
+    Serial.print(millis());
+    Serial.println(F("\","));
+    Serial.print(F("    \"duration_ms\": "));
+    Serial.print(millis() - flightStartTime);
+    Serial.println(F(","));
+    Serial.println(F("    \"gps_available\": true,"));
+    Serial.print(F("    \"position_count\": "));
+    Serial.print(positionCount);
+    Serial.println(F(","));
+    Serial.println(F("    \"parameters\": {"));
+    Serial.print(F("      \"motor_run_time\": "));
+    Serial.print(currentParams.motorRunTime);
+    Serial.println(F(","));
+    Serial.print(F("      \"total_flight_time\": "));
+    Serial.print(currentParams.totalFlightTime);
+    Serial.println(F(","));
+    Serial.print(F("      \"motor_speed\": "));
+    Serial.println(currentParams.motorSpeed);
+    Serial.println(F("    }"));
+    Serial.println(F("  },"));
+    Serial.println(F("  \"position_records\": ["));
+
+    for (int i = 0; i < positionCount; i++) {
+      Serial.print(F("    {"));
+      Serial.print(F("\"timestamp_ms\": "));
+      Serial.print(flightPath[i].timestamp);
+      Serial.print(F(", \"flight_state\": "));
+      Serial.print(flightPath[i].flightState);
+      Serial.print(F(", \"state_name\": \""));
+      Serial.print(getStateName(flightPath[i].flightState));
+      Serial.print(F("\", \"latitude\": "));
+      Serial.print(flightPath[i].latitude, 6);
+      Serial.print(F(", \"longitude\": "));
+      Serial.print(flightPath[i].longitude, 6);
+      Serial.print(F("}"));
+      if (i < positionCount - 1) Serial.println(F(","));
+      else Serial.println();
+    }
+
+    Serial.println(F("  ]"));
+    Serial.println(F("}"));
+  } else if (format == "C") {
+    // CSV format
+    Serial.println(F("Time_Seconds,Flight_State,State_Name,Latitude,Longitude"));
+    for (int i = 0; i < positionCount; i++) {
+      Serial.print(flightPath[i].timestamp / 1000.0, 1);
+      Serial.print(F(","));
+      Serial.print(flightPath[i].flightState);
+      Serial.print(F(","));
+      Serial.print(getStateName(flightPath[i].flightState));
+      Serial.print(F(","));
+      Serial.print(flightPath[i].latitude, 6);
+      Serial.print(F(","));
+      Serial.println(flightPath[i].longitude, 6);
+    }
+  }
+
+  Serial.println(F("[END_FLIGHT_DATA]"));
+  Serial.print(F("[INFO] Downloaded "));
+  Serial.print(positionCount);
+  Serial.print(F(" GPS positions in "));
+  Serial.print(format == "C" ? "CSV" : "JSON");
+  Serial.println(F(" format"));
+}
+
+const char* getStateName(int state) {
+  switch (state) {
+    case 1: return "READY";
+    case 2: return "ARMED";
+    case 3: return "MOTOR_SPOOL";
+    case 4: return "MOTOR_RUN";
+    case 5: return "GLIDE";
+    case 6: return "DT_DEPLOY";
+    case 99: return "LANDING";
+    default: return "UNKNOWN";
+  }
 }
