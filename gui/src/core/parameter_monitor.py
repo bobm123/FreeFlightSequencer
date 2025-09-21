@@ -29,9 +29,8 @@ class ParameterMonitor:
                 'motor_run_time': r'Motor Run Time:\s*(\d+)\s*seconds?',
                 'total_flight_time': r'Total Flight Time:\s*(\d+)\s*seconds?',
                 'motor_speed': r'Motor Speed:\s*(\d+)',
-                'current_phase': r'Phase.*?([A-Z_]+)',
-                'flight_timer': r'Time.*?(\d+):(\d+)',
-                'flights_completed': r'Flight.*?(\d+)'
+                'current_phase': r'Current Phase:\s*([A-Z_]+)|System ready|System ARMED|LAUNCH.*Motor|Motor at flight speed|Motor.*complete|entering glide|Flight time complete|deploying DT|Dethermalizer DEPLOYED|flight complete|System RESET',
+                'flight_timer': r'Time.*?(\d+):(\d+)'
             },
             ApplicationType.GPS_AUTOPILOT: {
                 'orbit_radius': r'Orbit Radius.*?(\d*\.?\d+)',
@@ -116,7 +115,38 @@ class ParameterMonitor:
                     if param_name in ['gps_fix']:
                         # Boolean parameters
                         value = match.group(1).lower() in ['true', 'ok', 'valid']
-                    elif param_name in ['current_phase', 'nav_mode', 'flight_mode', 'test_status', 
+                    elif param_name == 'current_phase':
+                        # Special case for flight phase - handle both direct phase and messages
+                        matched_text = match.group(0).lower()
+                        if 'current phase:' in matched_text:
+                            # Direct phase from G command: "Current Phase: READY"
+                            try:
+                                value = match.group(1).upper()
+                            except IndexError:
+                                value = 'UNKNOWN'
+                        elif 'system ready' in matched_text:
+                            value = 'READY'
+                        elif 'system armed' in matched_text:
+                            value = 'ARMED'
+                        elif 'launch' in matched_text and 'motor' in matched_text:
+                            value = 'MOTOR_SPOOL'
+                        elif 'motor at flight speed' in matched_text:
+                            value = 'MOTOR_RUN'
+                        elif 'motor' in matched_text and 'complete' in matched_text:
+                            value = 'MOTOR_RUN_COMPLETE'
+                        elif 'entering glide' in matched_text:
+                            value = 'GLIDE'
+                        elif 'flight time complete' in matched_text or 'deploying dt' in matched_text:
+                            value = 'DT_DEPLOY'
+                        elif 'dethermalizer deployed' in matched_text:
+                            value = 'DT_DEPLOYED'
+                        elif 'flight complete' in matched_text:
+                            value = 'LANDING'
+                        elif 'system reset' in matched_text:
+                            value = 'READY'
+                        else:
+                            value = 'UNKNOWN'
+                    elif param_name in ['nav_mode', 'flight_mode', 'test_status',
                                       'button_state', 'esc_armed']:
                         # String parameters
                         value = match.group(1).upper()

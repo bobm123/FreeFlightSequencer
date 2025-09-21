@@ -210,11 +210,11 @@ class ArduinoControlCenter:
     def _on_connection_changed(self, connected, port):
         """Handle connection state changes."""
         self.connected = connected
-        
+
         if connected:
             self.connection_status_var.set(f"Connected to {port}")
             self.detected_app_var.set("Detecting...")
-            
+
             # Send identification query after connection
             self.root.after(2000, self.tab_manager.send_identification_query)
         else:
@@ -223,6 +223,12 @@ class ArduinoControlCenter:
             self.current_app = ApplicationType.UNKNOWN
             self.message_count = 0
             self.message_count_var.set("Messages: 0")
+
+        # Notify all tabs about connection change
+        for app_type, tab_info in self.tabs.items():
+            tab = tab_info['tab']
+            if hasattr(tab, 'handle_connection_change'):
+                tab.handle_connection_change(connected)
             
     def _on_application_detected(self, app_type):
         """Handle application detection."""

@@ -39,15 +39,7 @@ class FlightSequencerTab:
         # Create main tab frame
         self.frame = ttk.Frame(parent)
         
-        # Flight profiles
-        self.profiles = {
-            "Test Flight": {"motor_time": "5", "flight_time": "30", "motor_speed": "120"},
-            "Competition": {"motor_time": "20", "flight_time": "120", "motor_speed": "150"},
-            "Max Duration": {"motor_time": "30", "flight_time": "300", "motor_speed": "110"}
-        }
-        
         self._create_widgets()
-        self._load_profiles()
         
         # Register with tab manager
         from core.tab_manager import ApplicationType
@@ -83,22 +75,6 @@ class FlightSequencerTab:
         
     def _create_flight_controls(self, parent):
         """Create flight parameter controls."""
-        # Profile selection frame
-        profile_frame = ttk.LabelFrame(parent, text="Flight Profiles")
-        profile_frame.pack(fill='x', padx=5, pady=5)
-        
-        # Profile dropdown
-        ttk.Label(profile_frame, text="Profile:").pack(side='left', padx=5)
-        self.profile_var = tk.StringVar(value="Custom")
-        profile_combo = ttk.Combobox(profile_frame, textvariable=self.profile_var,
-                                   values=list(self.profiles.keys()) + ["Custom"],
-                                   state='readonly', width=15)
-        profile_combo.pack(side='left', padx=5)
-        profile_combo.bind('<<ComboboxSelected>>', self._load_profile)
-        
-        ttk.Button(profile_frame, text="Save As...", 
-                  command=self._save_custom_profile).pack(side='right', padx=5)
-        
         # Parameter controls frame
         param_frame = ttk.LabelFrame(parent, text="Flight Parameters")
         param_frame.pack(fill='x', padx=5, pady=5)
@@ -107,25 +83,25 @@ class FlightSequencerTab:
         motor_frame = ttk.Frame(param_frame)
         motor_frame.pack(fill='x', padx=5, pady=2)
         ttk.Label(motor_frame, text="Motor Run Time (sec):").pack(side='left')
-        self.motor_time_var = tk.StringVar(value="20")
+        self.motor_time_var = tk.StringVar(value="")
         motor_entry = ttk.Entry(motor_frame, textvariable=self.motor_time_var, width=8)
         motor_entry.pack(side='left', padx=5)
         ttk.Button(motor_frame, text="Set", command=self._set_motor_time).pack(side='left', padx=2)
-        
+
         # Total Flight Time
         flight_frame = ttk.Frame(param_frame)
         flight_frame.pack(fill='x', padx=5, pady=2)
         ttk.Label(flight_frame, text="Total Flight Time (sec):").pack(side='left')
-        self.flight_time_var = tk.StringVar(value="120")
+        self.flight_time_var = tk.StringVar(value="")
         flight_entry = ttk.Entry(flight_frame, textvariable=self.flight_time_var, width=8)
         flight_entry.pack(side='left', padx=5)
         ttk.Button(flight_frame, text="Set", command=self._set_flight_time).pack(side='left', padx=2)
-        
+
         # Motor Speed
         speed_frame = ttk.Frame(param_frame)
         speed_frame.pack(fill='x', padx=5, pady=2)
         ttk.Label(speed_frame, text="Motor Speed (95-200):").pack(side='left')
-        self.motor_speed_var = tk.StringVar(value="150")
+        self.motor_speed_var = tk.StringVar(value="")
         speed_entry = ttk.Entry(speed_frame, textvariable=self.motor_speed_var, width=8)
         speed_entry.pack(side='left', padx=5)
         ttk.Button(speed_frame, text="Set", command=self._set_motor_speed).pack(side='left', padx=2)
@@ -171,89 +147,23 @@ class FlightSequencerTab:
         """Create flight status display."""
         status_frame = ttk.LabelFrame(parent, text="Flight Status")
         status_frame.pack(fill='both', expand=True, padx=5, pady=5)
-        
-        # Current parameters display
-        ttk.Label(status_frame, text="Current Parameters:", 
-                 font=('TkDefaultFont', 9, 'bold')).pack(anchor='w', padx=5, pady=2)
-        
-        self.current_params_text = tk.Text(status_frame, height=8, width=30, state='disabled',
-                                         font=('Consolas', 9))
-        self.current_params_text.pack(fill='x', padx=5, pady=2)
-        
-        # Flight statistics
-        stats_frame = ttk.Frame(status_frame)
-        stats_frame.pack(fill='x', padx=5, pady=5)
-        
-        self.flights_completed_var = tk.StringVar(value="Flights: 0")
-        ttk.Label(stats_frame, textvariable=self.flights_completed_var).pack(side='left')
-        
-        self.current_phase_var = tk.StringVar(value="Phase: IDLE")
-        ttk.Label(stats_frame, textvariable=self.current_phase_var).pack(side='right')
-        
-        # Timer display
-        self.timer_var = tk.StringVar(value="Time: 00:00")
-        timer_label = ttk.Label(status_frame, textvariable=self.timer_var, 
-                              font=('Digital-7', 14, 'bold'))
-        timer_label.pack(pady=5)
-        
-    def _load_profile(self, event=None):
-        """Load selected flight profile."""
-        profile_name = self.profile_var.get()
-        if profile_name in self.profiles:
-            profile = self.profiles[profile_name]
-            self.motor_time_var.set(profile["motor_time"])
-            self.flight_time_var.set(profile["flight_time"])
-            self.motor_speed_var.set(profile["motor_speed"])
-            
-    def _save_custom_profile(self):
-        """Save current settings as custom profile."""
-        name = tk.simpledialog.askstring("Save Profile", "Enter profile name:")
-        if name:
-            self.profiles[name] = {
-                "motor_time": self.motor_time_var.get(),
-                "flight_time": self.flight_time_var.get(),
-                "motor_speed": self.motor_speed_var.get()
-            }
-            self._save_profiles()
-            
-            # Update combo box
-            profile_combo = None
-            for widget in self.frame.winfo_children():
-                if isinstance(widget, ttk.PanedWindow):
-                    for child in widget.winfo_children():
-                        for grandchild in child.winfo_children():
-                            if isinstance(grandchild, ttk.LabelFrame) and "Profile" in grandchild['text']:
-                                for element in grandchild.winfo_children():
-                                    if isinstance(element, ttk.Combobox):
-                                        element['values'] = list(self.profiles.keys()) + ["Custom"]
-                                        break
-                                        
-    def _load_profiles(self):
-        """Load flight profiles from file."""
-        try:
-            profiles_file = os.path.expanduser("~/.arduino_gui/flight_profiles.json")
-            if os.path.exists(profiles_file):
-                with open(profiles_file, 'r') as f:
-                    saved_profiles = json.load(f)
-                    self.profiles.update(saved_profiles)
-        except Exception as e:
-            print(f"Failed to load profiles: {e}")
-            
-    def _save_profiles(self):
-        """Save flight profiles to file."""
-        try:
-            config_dir = os.path.expanduser("~/.arduino_gui")
-            os.makedirs(config_dir, exist_ok=True)
-            profiles_file = os.path.join(config_dir, "flight_profiles.json")
-            
-            # Only save custom profiles (not built-in ones)
-            custom_profiles = {k: v for k, v in self.profiles.items() 
-                             if k not in ["Test Flight", "Competition", "Max Duration"]}
-            
-            with open(profiles_file, 'w') as f:
-                json.dump(custom_profiles, f, indent=2)
-        except Exception as e:
-            print(f"Failed to save profiles: {e}")
+
+        # Flight phase - larger, more prominent
+        phase_frame = ttk.Frame(status_frame)
+        phase_frame.pack(fill='x', padx=5, pady=10)
+
+        self.current_phase_var = tk.StringVar(value="Phase: UNKNOWN")
+        phase_label = ttk.Label(phase_frame, textvariable=self.current_phase_var,
+                               font=('TkDefaultFont', 12, 'bold'))
+        phase_label.pack()
+
+        # Timer display - prominent for flight timing
+        self.timer_var = tk.StringVar(value="Time: --:--")
+        timer_label = ttk.Label(status_frame, textvariable=self.timer_var,
+                              font=('TkDefaultFont', 14, 'bold'))
+        timer_label.pack(pady=10)
+
+        # Flight statistics - removed misleading flight count
             
     def _send_command(self, command):
         """Send command to FlightSequencer."""
@@ -305,6 +215,8 @@ class FlightSequencerTab:
     def _get_parameters(self):
         """Get current parameters from FlightSequencer."""
         self._send_command("G")
+        # Schedule input field update after a brief delay to allow response
+        self.parent.after(1000, self._update_input_fields_from_monitor)
         
     def _reset_parameters(self):
         """Reset parameters to defaults."""
@@ -327,68 +239,69 @@ class FlightSequencerTab:
         # Display in serial monitor
         self.serial_monitor_widget.log_received(data)
         
-        # Update current parameters display
-        self._update_current_params()
-        
-        # Update flight status
+        # Update flight status from [INFO] messages
         self._update_flight_status(data)
 
         # Handle flight data download
         self._handle_flight_data_response(data)
 
-    def _update_current_params(self):
-        """Update the current parameters display and input fields."""
-        def update_params():
+
+    def handle_connection_change(self, connected):
+        """Handle connection status changes."""
+        if not connected:
+            # Clear parameters when disconnected
+            self._clear_parameters()
+        else:
+            # On connection, automatically get current parameters and status
+            self.parent.after(2500, self._get_parameters)  # Send G command after Arduino settles
+
+    def _clear_parameters(self):
+        """Clear parameter display and input fields when disconnected."""
+        def clear_params():
+            # Clear parameter monitor
+            self.param_monitor.clear_parameters()
+
+            # Clear input fields
+            self.motor_time_var.set("")
+            self.flight_time_var.set("")
+            self.motor_speed_var.set("")
+
+            # Clear status fields
+            self.current_phase_var.set("Phase: DISCONNECTED")
+            self.timer_var.set("Time: --:--")
+
+        self.parent.after(0, clear_params)
+
+    def _update_input_fields_from_monitor(self):
+        """Update input fields with current parameter monitor values (used on connection/get parameters)."""
+        def update_fields():
+            params = self.param_monitor.get_parameters()
+            if params:
+                if 'motor_run_time' in params:
+                    self.motor_time_var.set(str(params['motor_run_time']))
+                if 'total_flight_time' in params:
+                    self.flight_time_var.set(str(params['total_flight_time']))
+                if 'motor_speed' in params:
+                    self.motor_speed_var.set(str(params['motor_speed']))
+
+        self.parent.after(0, update_fields)
+
+    def _update_flight_status(self, data):
+        """Update flight status from parameter monitor data."""
+        def update_status():
             params = self.param_monitor.get_parameters()
 
-            # Update the display text widget
-            self.current_params_text.config(state='normal')
-            self.current_params_text.delete(1.0, tk.END)
+            # Update phase
+            if 'current_phase' in params:
+                phase = params['current_phase']
+                self.current_phase_var.set(f"Phase: {phase}")
 
-            if params:
-                # Update display
-                if 'motor_run_time' in params:
-                    self.current_params_text.insert(tk.END, f"Motor Time: {params['motor_run_time']}s\\n")
-                    # Update input field
-                    self.motor_time_var.set(str(params['motor_run_time']))
+            # Update timer
+            if 'flight_timer' in params:
+                timer = params['flight_timer']
+                self.timer_var.set(f"Time: {timer}")
 
-                if 'total_flight_time' in params:
-                    self.current_params_text.insert(tk.END, f"Flight Time: {params['total_flight_time']}s\\n")
-                    # Update input field
-                    self.flight_time_var.set(str(params['total_flight_time']))
-
-                if 'motor_speed' in params:
-                    speed = params['motor_speed']
-                    self.current_params_text.insert(tk.END, f"Motor Speed: {speed}\\n")
-                    self.current_params_text.insert(tk.END, f"PWM: {speed * 10}us\\n")
-                    # Update input field
-                    self.motor_speed_var.set(str(speed))
-            else:
-                self.current_params_text.insert(tk.END, "No parameters\\nreceived yet")
-
-            self.current_params_text.config(state='disabled')
-
-        self.parent.after(0, update_params)
-        
-    def _update_flight_status(self, data):
-        """Update flight status from serial data."""
-        # Extract flight phase
-        phase_match = re.search(r'Phase.*?([A-Z_]+)', data, re.IGNORECASE)
-        if phase_match:
-            phase = phase_match.group(1)
-            self.current_phase_var.set(f"Phase: {phase}")
-            
-        # Extract timer information
-        timer_match = re.search(r'Time.*?(\d+):(\d+)', data)
-        if timer_match:
-            minutes, seconds = timer_match.groups()
-            self.timer_var.set(f"Time: {minutes}:{seconds}")
-            
-        # Extract flight count
-        flight_match = re.search(r'Flight.*?(\d+)', data, re.IGNORECASE)
-        if flight_match:
-            count = flight_match.group(1)
-            self.flights_completed_var.set(f"Flights: {count}")
+        self.parent.after(0, update_status)
             
     def _download_flight_data(self):
         """Download flight records from Arduino."""

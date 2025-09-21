@@ -165,7 +165,7 @@ void processGPSData();
 bool parseNMEASentence(String sentence);
 void recordPosition();
 void clearFlightRecords();
-void downloadFlightRecords(String format);
+void downloadFlightRecords();
 const char* getStateName(int state);
 
 // Serial parameter programming functions
@@ -894,8 +894,7 @@ void processSerialCommand() {
 
     case 'D': {
       // Download flight records
-      String format = command.length() > 2 ? command.substring(2) : "J";
-      downloadFlightRecords(format);
+      downloadFlightRecords();
       break;
     }
 
@@ -933,6 +932,8 @@ void showParameters() {
   Serial.print(F(" ("));
   Serial.print(currentParams.motorSpeed * 10);
   Serial.println(F("us PWM)"));
+  Serial.print(F("[INFO] Current Phase: "));
+  Serial.println(getStateName(flightState));
 }
 
 void showHelp() {
@@ -954,7 +955,7 @@ void showHelp() {
   Serial.println(F(")"));
   Serial.println(F("[INFO] G         - Get current parameters"));
   Serial.println(F("[INFO] R         - Reset to defaults"));
-  Serial.println(F("[INFO] D [J/C]   - Download flight records (JSON/CSV)"));
+  Serial.println(F("[INFO] D         - Download flight records"));
   Serial.println(F("[INFO] X         - Clear flight records"));
   Serial.println(F("[INFO] ?         - Show this help"));
   if (gpsAvailable) {
@@ -1095,7 +1096,7 @@ void clearFlightRecords() {
   Serial.println(F(" positions available)"));
 }
 
-void downloadFlightRecords(String format) {
+void downloadFlightRecords() {
   if (positionCount == 0) {
     Serial.println(F("[INFO] No flight records available"));
     if (gpsAvailable) {
