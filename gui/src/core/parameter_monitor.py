@@ -26,9 +26,9 @@ class ParameterMonitor:
         # Parameter patterns for different applications
         self.parameter_patterns = {
             ApplicationType.FLIGHT_SEQUENCER: {
-                'motor_run_time': r'Motor Run Time.*?(\d+)',
-                'total_flight_time': r'Total Flight Time.*?(\d+)',
-                'motor_speed': r'Motor Speed.*?(\d+)',
+                'motor_run_time': r'Motor Run Time:\s*(\d+)\s*seconds?',
+                'total_flight_time': r'Total Flight Time:\s*(\d+)\s*seconds?',
+                'motor_speed': r'Motor Speed:\s*(\d+)',
                 'current_phase': r'Phase.*?([A-Z_]+)',
                 'flight_timer': r'Time.*?(\d+):(\d+)',
                 'flights_completed': r'Flight.*?(\d+)'

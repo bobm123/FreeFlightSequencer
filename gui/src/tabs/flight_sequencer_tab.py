@@ -337,27 +337,37 @@ class FlightSequencerTab:
         self._handle_flight_data_response(data)
 
     def _update_current_params(self):
-        """Update the current parameters display."""
+        """Update the current parameters display and input fields."""
         def update_params():
             params = self.param_monitor.get_parameters()
-            
+
+            # Update the display text widget
             self.current_params_text.config(state='normal')
             self.current_params_text.delete(1.0, tk.END)
-            
+
             if params:
+                # Update display
                 if 'motor_run_time' in params:
                     self.current_params_text.insert(tk.END, f"Motor Time: {params['motor_run_time']}s\\n")
+                    # Update input field
+                    self.motor_time_var.set(str(params['motor_run_time']))
+
                 if 'total_flight_time' in params:
                     self.current_params_text.insert(tk.END, f"Flight Time: {params['total_flight_time']}s\\n")
+                    # Update input field
+                    self.flight_time_var.set(str(params['total_flight_time']))
+
                 if 'motor_speed' in params:
                     speed = params['motor_speed']
                     self.current_params_text.insert(tk.END, f"Motor Speed: {speed}\\n")
                     self.current_params_text.insert(tk.END, f"PWM: {speed * 10}us\\n")
+                    # Update input field
+                    self.motor_speed_var.set(str(speed))
             else:
                 self.current_params_text.insert(tk.END, "No parameters\\nreceived yet")
-                
+
             self.current_params_text.config(state='disabled')
-            
+
         self.parent.after(0, update_params)
         
     def _update_flight_status(self, data):
@@ -449,6 +459,24 @@ class FlightSequencerTab:
                     self.records_status_var.set("Records: N/A (No GPS)")
             return
 
+        # Check for "no data available" response - cancel download immediately
+        if "No flight records available" in data:
+            self.downloading_data = False
+            if hasattr(self, 'progress_window'):
+                self.progress_window.destroy()
+
+            # Show appropriate message based on reason
+            if "GPS not available" in data:
+                messagebox.showinfo("No Data", "No flight records available:\nGPS module not detected.")
+                self.records_status_var.set("Records: N/A (No GPS)")
+            elif "GPS detected but no positions recorded" in data:
+                messagebox.showinfo("No Data", "No flight records available:\nGPS detected but no flight data recorded yet.")
+                self.records_status_var.set("Records: 0 positions")
+            else:
+                messagebox.showinfo("No Data", "No flight records available.")
+                self.records_status_var.set("Records: None")
+            return
+
         # Collect data until END marker
         self.flight_data_buffer += data + "\n"
 
@@ -461,40 +489,103 @@ class FlightSequencerTab:
     def _process_downloaded_data(self):
         """Process and save downloaded flight data."""
         try:
-            # Extract JSON from buffer
-            json_start = self.flight_data_buffer.find("{")
-            json_end = self.flight_data_buffer.rfind("}") + 1
+            # Parse CSV format from buffer
+            lines = self.flight_data_buffer.strip().split('\n')
 
-            if json_start >= 0 and json_end > json_start:
-                flight_data = json.loads(self.flight_data_buffer[json_start:json_end])
+            flight_header = None
+            gps_records = []
+
+            for line in lines:
+                line = line.strip()
+                if line.startswith('HEADER,'):
+                    # Parse header: HEADER,flight_id,duration_ms,gps_available,position_count,motor_run_time,total_flight_time,motor_speed
+                    parts = line.split(',')
+                    if len(parts) >= 8:
+                        flight_header = {
+                            'flight_id': parts[1],
+                            'duration_ms': int(parts[2]),
+                            'gps_available': parts[3] == 'true',
+                            'position_count': int(parts[4]),
+                            'parameters': {
+                                'motor_run_time': int(parts[5]),
+                                'total_flight_time': int(parts[6]),
+                                'motor_speed': int(parts[7])
+                            }
+                        }
+                elif line.startswith('GPS,'):
+                    # Parse GPS record: GPS,timestamp_ms,flight_state,state_name,latitude,longitude
+                    parts = line.split(',')
+                    if len(parts) >= 6:
+                        gps_records.append({
+                            'timestamp_ms': int(parts[1]),
+                            'flight_state': int(parts[2]),
+                            'state_name': parts[3],
+                            'latitude': float(parts[4]),
+                            'longitude': float(parts[5])
+                        })
+
+            if flight_header and gps_records:
+                # Create flight data structure
+                flight_data = {
+                    'flight_header': flight_header,
+                    'position_records': gps_records
+                }
+
                 self.last_flight_data = flight_data
 
-                # Save to file
+                # Save to file in ./flightdata directory
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"flight_data_{timestamp}.json"
 
-                file_path = filedialog.asksaveasfilename(
-                    defaultextension=".json",
-                    filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-                    initialname=filename
-                )
+                # Create flightdata directory if it doesn't exist
+                flightdata_dir = os.path.join(os.getcwd(), "flightdata")
+                os.makedirs(flightdata_dir, exist_ok=True)
 
-                if file_path:
-                    with open(file_path, 'w') as f:
+                try:
+                    # Combine directory and filename for initialfile
+                    initial_file_path = os.path.join(flightdata_dir, filename)
+
+                    file_path = filedialog.asksaveasfilename(
+                        defaultextension=".json",
+                        filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+                        initialfile=initial_file_path,
+                        parent=self.parent,
+                        title="Save Flight Data"
+                    )
+
+                    if file_path:
+                        # User selected a file location
+                        with open(file_path, 'w') as f:
+                            json.dump(flight_data, f, indent=2)
+                        # File saved successfully - no message needed
+                    else:
+                        # User cancelled - don't save anything
+                        return
+
+                except Exception as dialog_error:
+                    # Fallback: save to flightdata directory with timestamp
+                    fallback_path = os.path.join(flightdata_dir, filename)
+                    with open(fallback_path, 'w') as f:
                         json.dump(flight_data, f, indent=2)
+                    messagebox.showinfo("Success", f"Flight data saved to:\n{fallback_path}\n\n(File dialog error: {str(dialog_error)})")
 
-                    messagebox.showinfo("Success", f"Flight data saved to:\n{file_path}")
-
-                    # Update status
-                    position_count = len(flight_data.get('position_records', []))
-                    self.records_status_var.set(f"Records: {position_count} positions")
-                    if position_count > 0:
-                        self.gps_status_var.set("GPS: Data downloaded")
+                # Update status
+                position_count = len(gps_records)
+                self.records_status_var.set(f"Records: {position_count} positions")
+                if position_count > 0:
+                    self.gps_status_var.set("GPS: Data downloaded")
             else:
-                messagebox.showwarning("No Data", "No valid flight data received from Arduino")
+                messagebox.showwarning("No Data", "No valid flight data found in Arduino response")
 
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to process flight data:\n{str(e)}")
+            # Save the problematic data for debugging
+            debug_file = f"debug_csv_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            with open(debug_file, 'w') as f:
+                f.write("Raw buffer:\n")
+                f.write(repr(self.flight_data_buffer))
+                f.write(f"\n\nParse Error: {str(e)}")
+
+            messagebox.showerror("Parse Error", f"Failed to process flight data:\n{str(e)}\n\nDebug data saved to: {debug_file}")
 
     def _create_flight_path_window(self):
         """Create flight path visualization window."""
@@ -541,8 +632,8 @@ class FlightSequencerTab:
         plt.colorbar(scatter, ax=ax1, label='Time (seconds)')
 
         # Add state markers
-        state_colors = {3: 'red', 4: 'orange', 5: 'green', 6: 'purple'}
-        state_labels = {3: 'Spool', 4: 'Motor', 5: 'Glide', 6: 'DT Deploy'}
+        state_colors = {3: 'red', 4: 'orange', 5: 'green', 6: 'purple', 7: 'brown'}
+        state_labels = {3: 'Spool', 4: 'Motor', 5: 'Glide', 6: 'DT Deploy', 7: 'Post-DT'}
 
         for state in state_colors:
             state_positions = [(lon, lat) for lon, lat, s in zip(lons, lats, states) if s == state]
@@ -559,8 +650,8 @@ class FlightSequencerTab:
         ax2.set_ylabel('Flight State')
         ax2.set_title('Flight State Timeline')
         ax2.grid(True, alpha=0.3)
-        ax2.set_yticks([1, 2, 3, 4, 5, 6, 99])
-        ax2.set_yticklabels(['Ready', 'Armed', 'Spool', 'Motor', 'Glide', 'DT', 'Land'])
+        ax2.set_yticks([1, 2, 3, 4, 5, 6, 7, 99])
+        ax2.set_yticklabels(['Ready', 'Armed', 'Spool', 'Motor', 'Glide', 'DT', 'Post-DT', 'Land'])
 
         plt.tight_layout()
 
@@ -589,10 +680,19 @@ class FlightSequencerTab:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"flight_path_{timestamp}.csv"
 
+        # Create flightdata directory if it doesn't exist
+        flightdata_dir = os.path.join(os.getcwd(), "flightdata")
+        os.makedirs(flightdata_dir, exist_ok=True)
+
+        # Combine directory and filename for initialfile
+        initial_file_path = os.path.join(flightdata_dir, filename)
+
         file_path = filedialog.asksaveasfilename(
             defaultextension=".csv",
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
-            initialname=filename
+            initialfile=initial_file_path,
+            parent=self.parent,
+            title="Export Flight Path as CSV"
         )
 
         if file_path:
@@ -612,7 +712,9 @@ class FlightSequencerTab:
                         pos['longitude']
                     ])
 
-            messagebox.showinfo("Success", f"CSV exported to:\n{file_path}")
+            # CSV exported successfully - no message needed
+            pass
+        # User cancelled - no message needed
 
     def _export_kml(self):
         """Export flight path to KML for Google Earth."""
@@ -623,10 +725,19 @@ class FlightSequencerTab:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"flight_path_{timestamp}.kml"
 
+        # Create flightdata directory if it doesn't exist
+        flightdata_dir = os.path.join(os.getcwd(), "flightdata")
+        os.makedirs(flightdata_dir, exist_ok=True)
+
+        # Combine directory and filename for initialfile
+        initial_file_path = os.path.join(flightdata_dir, filename)
+
         file_path = filedialog.asksaveasfilename(
             defaultextension=".kml",
             filetypes=[("KML files", "*.kml"), ("All files", "*.*")],
-            initialname=filename
+            initialfile=initial_file_path,
+            parent=self.parent,
+            title="Export Flight Path as KML"
         )
 
         if file_path:
@@ -665,6 +776,8 @@ class FlightSequencerTab:
                 f.write(kml_content)
 
             messagebox.showinfo("Success", f"KML exported to:\n{file_path}")
+        else:
+            messagebox.showinfo("Cancelled", "KML export cancelled by user.")
 
     def get_frame(self):
         """Get the main tab frame."""
