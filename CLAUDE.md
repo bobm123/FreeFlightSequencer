@@ -394,3 +394,45 @@ void advanceToNextPhase(TestPhase nextPhase) {
 - **State order dependencies**: Creating hidden dependencies between state order
 
 These patterns ensure maintainable, debuggable state machines suitable for complex flight control and navigation systems.
+
+## GUI Design Guidelines
+
+### Tkinter Layout Alignment Principles
+
+#### Label Alignment in Parameter Forms
+When creating parameter input forms with labels, entry fields, and buttons, ensure consistent alignment using fixed-width labels rather than spacing characters.
+
+**Problem**: Using spaces or manual padding in label text does not provide reliable alignment across different fonts and platforms.
+
+```python
+# AVOID - Unreliable spacing with manual characters
+ttk.Label(frame, text="Motor Run Time (sec): ").pack(side='left')     # 1 space
+ttk.Label(frame, text="DT Retracted (us):    ").pack(side='left')     # 4 spaces
+ttk.Label(frame, text="DT Deployed (us):     ").pack(side='left')     # 5 spaces
+```
+
+**Solution**: Use consistent `width` parameter on all labels to create uniform column alignment.
+
+```python
+# PREFERRED - Fixed width ensures perfect alignment
+ttk.Label(frame, text="Motor Run Time (sec):", width=22).pack(side='left')
+ttk.Label(frame, text="Total Flight Time (sec):", width=22).pack(side='left')
+ttk.Label(frame, text="Motor Speed (95-200):", width=22).pack(side='left')
+ttk.Label(frame, text="DT Retracted (us):", width=22).pack(side='left')
+ttk.Label(frame, text="DT Deployed (us):", width=22).pack(side='left')
+ttk.Label(frame, text="DT Dwell Time (sec):", width=22).pack(side='left')
+```
+
+#### Width Sizing Guidelines
+- **Measure the longest label text** in the group and add 2-3 characters for padding
+- **Use consistent width** across all related labels in the same form section
+- **Standard widths**: 15 chars for short labels, 22 chars for medium labels, 30 chars for long labels
+- **Test on different platforms** to ensure alignment works on Windows, Mac, and Linux
+
+#### Benefits
+- **Professional appearance**: Perfect vertical alignment of input fields and buttons
+- **Cross-platform consistency**: Width-based alignment works regardless of font rendering
+- **Maintainable code**: Easy to add new parameters without breaking alignment
+- **User experience**: Consistent visual structure improves form usability
+
+This pattern should be applied to all parameter input forms, configuration dialogs, and settings panels in the GUI applications.

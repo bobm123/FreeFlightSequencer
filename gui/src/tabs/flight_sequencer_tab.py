@@ -42,7 +42,10 @@ class FlightSequencerTab:
             'total_flight_time': None,
             'motor_speed': None,
             'current_phase': 'UNKNOWN',
-            'gps_state': 'UNKNOWN'
+            'gps_state': 'UNKNOWN',
+            'dt_retracted': None,
+            'dt_deployed': None,
+            'dt_dwell': None
         }
 
         # Create main tab frame
@@ -91,7 +94,7 @@ class FlightSequencerTab:
         # Motor Run Time
         motor_frame = ttk.Frame(param_frame)
         motor_frame.pack(fill='x', padx=5, pady=2)
-        ttk.Label(motor_frame, text="Motor Run Time (sec):").pack(side='left')
+        ttk.Label(motor_frame, text="Motor Run Time (sec):", width=22).pack(side='left')
         self.motor_time_var = tk.StringVar(value="")
         motor_entry = ttk.Entry(motor_frame, textvariable=self.motor_time_var, width=8)
         motor_entry.pack(side='left', padx=5)
@@ -100,7 +103,7 @@ class FlightSequencerTab:
         # Total Flight Time
         flight_frame = ttk.Frame(param_frame)
         flight_frame.pack(fill='x', padx=5, pady=2)
-        ttk.Label(flight_frame, text="Total Flight Time (sec):").pack(side='left')
+        ttk.Label(flight_frame, text="Total Flight Time (sec):", width=22).pack(side='left')
         self.flight_time_var = tk.StringVar(value="")
         flight_entry = ttk.Entry(flight_frame, textvariable=self.flight_time_var, width=8)
         flight_entry.pack(side='left', padx=5)
@@ -109,12 +112,39 @@ class FlightSequencerTab:
         # Motor Speed
         speed_frame = ttk.Frame(param_frame)
         speed_frame.pack(fill='x', padx=5, pady=2)
-        ttk.Label(speed_frame, text="Motor Speed (95-200):").pack(side='left')
+        ttk.Label(speed_frame, text="Motor Speed (95-200):", width=22).pack(side='left')
         self.motor_speed_var = tk.StringVar(value="")
         speed_entry = ttk.Entry(speed_frame, textvariable=self.motor_speed_var, width=8)
         speed_entry.pack(side='left', padx=5)
         ttk.Button(speed_frame, text="Set", command=self._set_motor_speed).pack(side='left', padx=2)
-        
+
+        # DT Retracted Position
+        dt_retracted_frame = ttk.Frame(param_frame)
+        dt_retracted_frame.pack(fill='x', padx=5, pady=2)
+        ttk.Label(dt_retracted_frame, text="DT Retracted (us):", width=22).pack(side='left')
+        self.dt_retracted_var = tk.StringVar(value="")
+        dt_retracted_entry = ttk.Entry(dt_retracted_frame, textvariable=self.dt_retracted_var, width=8)
+        dt_retracted_entry.pack(side='left', padx=5)
+        ttk.Button(dt_retracted_frame, text="Set", command=self._set_dt_retracted).pack(side='left', padx=2)
+
+        # DT Deployed Position
+        dt_deployed_frame = ttk.Frame(param_frame)
+        dt_deployed_frame.pack(fill='x', padx=5, pady=2)
+        ttk.Label(dt_deployed_frame, text="DT Deployed (us):", width=22).pack(side='left')
+        self.dt_deployed_var = tk.StringVar(value="")
+        dt_deployed_entry = ttk.Entry(dt_deployed_frame, textvariable=self.dt_deployed_var, width=8)
+        dt_deployed_entry.pack(side='left', padx=5)
+        ttk.Button(dt_deployed_frame, text="Set", command=self._set_dt_deployed).pack(side='left', padx=2)
+
+        # DT Dwell Time
+        dt_dwell_frame = ttk.Frame(param_frame)
+        dt_dwell_frame.pack(fill='x', padx=5, pady=2)
+        ttk.Label(dt_dwell_frame, text="DT Dwell Time (sec):", width=22).pack(side='left')
+        self.dt_dwell_var = tk.StringVar(value="")
+        dt_dwell_entry = ttk.Entry(dt_dwell_frame, textvariable=self.dt_dwell_var, width=8)
+        dt_dwell_entry.pack(side='left', padx=5)
+        ttk.Button(dt_dwell_frame, text="Set", command=self._set_dt_dwell).pack(side='left', padx=2)
+
         # Action buttons
         action_frame = ttk.Frame(param_frame)
         action_frame.pack(fill='x', padx=5, pady=5)
@@ -220,7 +250,46 @@ class FlightSequencerTab:
             self._send_command(command)
         except ValueError as e:
             messagebox.showerror("Invalid Value", str(e))
-            
+
+    def _set_dt_retracted(self):
+        """Set DT retracted position parameter."""
+        try:
+            pos_val = self.dt_retracted_var.get().strip()
+            # Validate range (standard servo range)
+            pos_int = int(pos_val)
+            if not (950 <= pos_int <= 2050):
+                raise ValueError("DT retracted position must be 950-2050 microseconds")
+            command = f"DR {pos_val}"
+            self._send_command(command)
+        except ValueError as e:
+            messagebox.showerror("Invalid Value", str(e))
+
+    def _set_dt_deployed(self):
+        """Set DT deployed position parameter."""
+        try:
+            pos_val = self.dt_deployed_var.get().strip()
+            # Validate range (standard servo range)
+            pos_int = int(pos_val)
+            if not (950 <= pos_int <= 2050):
+                raise ValueError("DT deployed position must be 950-2050 microseconds")
+            command = f"DD {pos_val}"
+            self._send_command(command)
+        except ValueError as e:
+            messagebox.showerror("Invalid Value", str(e))
+
+    def _set_dt_dwell(self):
+        """Set DT dwell time parameter."""
+        try:
+            time_val = self.dt_dwell_var.get().strip()
+            # Validate range
+            time_int = int(time_val)
+            if not (1 <= time_int <= 60):
+                raise ValueError("DT dwell time must be 1-60 seconds")
+            command = f"DW {time_val}"
+            self._send_command(command)
+        except ValueError as e:
+            messagebox.showerror("Invalid Value", str(e))
+
     def _get_parameters(self):
         """Get current parameters from FlightSequencer."""
         self._send_command("G")
@@ -271,13 +340,19 @@ class FlightSequencerTab:
                 'total_flight_time': None,
                 'motor_speed': None,
                 'current_phase': 'DISCONNECTED',
-                'gps_state': 'UNKNOWN'
+                'gps_state': 'UNKNOWN',
+                'dt_retracted': None,
+                'dt_deployed': None,
+                'dt_dwell': None
             }
 
             # Clear input fields
             self.motor_time_var.set("")
             self.flight_time_var.set("")
             self.motor_speed_var.set("")
+            self.dt_retracted_var.set("")
+            self.dt_deployed_var.set("")
+            self.dt_dwell_var.set("")
 
             # Clear status fields
             self.current_phase_var.set("Phase: DISCONNECTED")
@@ -302,6 +377,21 @@ class FlightSequencerTab:
         motor_speed_match = re.search(r'Motor Speed[:\s=]+(\d+)', data, re.IGNORECASE)
         if motor_speed_match:
             self.current_flight_params['motor_speed'] = int(motor_speed_match.group(1))
+
+        # DT Retracted patterns: "[INFO] DT Retracted: 1000us" or "[OK] DT Retracted = 1000"
+        dt_retracted_match = re.search(r'DT Retracted[:\s=]+(\d+)', data, re.IGNORECASE)
+        if dt_retracted_match:
+            self.current_flight_params['dt_retracted'] = int(dt_retracted_match.group(1))
+
+        # DT Deployed patterns: "[INFO] DT Deployed: 2000us" or "[OK] DT Deployed = 2000"
+        dt_deployed_match = re.search(r'DT Deployed[:\s=]+(\d+)', data, re.IGNORECASE)
+        if dt_deployed_match:
+            self.current_flight_params['dt_deployed'] = int(dt_deployed_match.group(1))
+
+        # DT Dwell patterns: "[INFO] DT Dwell: 5 seconds" or "[OK] DT Dwell = 5"
+        dt_dwell_match = re.search(r'DT Dwell[:\s=]+(\d+)', data, re.IGNORECASE)
+        if dt_dwell_match:
+            self.current_flight_params['dt_dwell'] = int(dt_dwell_match.group(1))
 
         # Current Phase patterns: "[INFO] Current Phase: READY" or state transition messages
         phase_match = re.search(r'Current Phase:\s*([A-Z_]+)', data, re.IGNORECASE)
@@ -351,6 +441,15 @@ class FlightSequencerTab:
 
             if params['motor_speed'] is not None:
                 self.motor_speed_var.set(str(params['motor_speed']))
+
+            if params['dt_retracted'] is not None:
+                self.dt_retracted_var.set(str(params['dt_retracted']))
+
+            if params['dt_deployed'] is not None:
+                self.dt_deployed_var.set(str(params['dt_deployed']))
+
+            if params['dt_dwell'] is not None:
+                self.dt_dwell_var.set(str(params['dt_dwell']))
 
             # Update phase display
             self.current_phase_var.set(f"Phase: {params['current_phase']}")

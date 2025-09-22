@@ -57,15 +57,21 @@ struct FlightParameters {
   unsigned short motorRunTime;
   unsigned short totalFlightTime;
   unsigned short motorSpeed;
+  unsigned short dtRetracted;  // DT retracted position (microseconds)
+  unsigned short dtDeployed;   // DT deployed position (microseconds)
+  unsigned short dtDwell;      // DT dwell time (seconds)
   bool valid;  // Flag to check if parameters are initialized
 };
 
 // Default parameters
 const FlightParameters DEFAULT_PARAMS = {
-  20,    // Motor run time (seconds)
-  120,   // Total flight time (seconds) 
-  150,   // Motor speed (150 -> 1500us PWM)
-  true   // Valid flag
+  20,     // Motor run time (seconds)
+  120,    // Total flight time (seconds)
+  150,    // Motor speed (150 -> 1500us PWM)
+  1000,   // DT retracted position (1000us)
+  2000,   // DT deployed position (2000us)
+  2,      // DT dwell time (2 seconds)
+  true    // Valid flag
 };
 
 // Current flight parameters (loaded from FlashStorage or defaults)
@@ -172,7 +178,8 @@ const char* getStateName(int state);
 void loadParameters();
 void saveParameters();
 void resetToDefaults();
-bool validateParameters(unsigned short motorTime, unsigned short totalTime, unsigned short motorSpeed);
+bool validateParameters(unsigned short motorTime, unsigned short totalTime, unsigned short motorSpeed,
+                       unsigned short dtRetracted, unsigned short dtDeployed, unsigned short dtDwell);
 void processSerialCommand();
 void showParameters();
 void showHelp();
@@ -287,8 +294,8 @@ void initializeSystem() {
   motorServo.attach(MOTOR_SERVO_PIN);
   
   // Set servos to safe initial positions
-  dtServo.writeMicroseconds(DT_RETRACT);        // DT retracted
-  motorServo.writeMicroseconds(MIN_SPEED * 10); // Motor idle
+  dtServo.writeMicroseconds(currentParams.dtRetracted);  // DT retracted
+  motorServo.writeMicroseconds(MIN_SPEED * 10);          // Motor idle
   
   // Calculate flight timing from current parameters
   motorTimeMS = currentParams.motorRunTime * 1000UL;
@@ -487,27 +494,35 @@ int executeGlideState(int currentState) {
 int executeDTDeployState(int currentState) {
   static unsigned long deployTime = 0;
   unsigned long currentTime = millis();
-  
-  // LED on during deployment
-  updateLED(LED_SOLID_RED, currentTime);
-  
+
+  // Landing blink pattern (50ms on, 2950ms off)
+  updateLED(LED_LANDING_BLINK, currentTime);
+
   // Ensure motor stays idle
   motorServo.writeMicroseconds(MIN_SPEED * 10);
-  
+
+  // Check for long press to reset
+  if (longPressDetected) {
+    dtServo.writeMicroseconds(currentParams.dtRetracted); // Retract DT servo
+    printTimestampedInfo(F("Manual DT retraction - flight complete"));
+    longPressDetected = false; // Clear the flag
+    return 99; // Transition to Landing State
+  }
+
   if (!dtDeployed) {
     // Deploy dethermalizer
-    dtServo.writeMicroseconds(DT_DEPLOY);
+    dtServo.writeMicroseconds(currentParams.dtDeployed);
     printTimestampedInfo(F("Dethermalizer DEPLOYED"));
     deployTime = millis();
     dtDeployTime = millis(); // Record DT deployment time for GPS tracking
     dtDeployed = true;
-  } else if (millis() - deployTime >= 2000) {
-    // Hold deployment for 2 seconds, then retract
-    dtServo.writeMicroseconds(DT_RETRACT);
+  } else if (millis() - deployTime >= (currentParams.dtDwell * 1000UL)) {
+    // Hold deployment for configured dwell time, then retract
+    dtServo.writeMicroseconds(currentParams.dtRetracted);
     printTimestampedInfo(F("Dethermalizer retracted - flight complete"));
     return 99; // Transition to Landing State
   }
-  
+
   return currentState; // Stay in DT Deploy State
 }
 
@@ -519,7 +534,7 @@ int executeLandingState(int currentState) {
   
   // Ensure safe servo positions
   motorServo.writeMicroseconds(MIN_SPEED * 10);
-  dtServo.writeMicroseconds(DT_RETRACT);
+  dtServo.writeMicroseconds(currentParams.dtRetracted);
   
   // Reset logic - long press to reset
   if (longPressDetected) {
@@ -722,10 +737,13 @@ void loadParameters() {
   currentParams = flash_store.read();
   
   // If parameters are not valid or this is first boot, use defaults
-  if (!currentParams.valid || 
-      !validateParameters(currentParams.motorRunTime, 
-                         currentParams.totalFlightTime, 
-                         currentParams.motorSpeed)) {
+  if (!currentParams.valid ||
+      !validateParameters(currentParams.motorRunTime,
+                         currentParams.totalFlightTime,
+                         currentParams.motorSpeed,
+                         currentParams.dtRetracted,
+                         currentParams.dtDeployed,
+                         currentParams.dtDwell)) {
     Serial.println(F("[INFO] Loading default parameters"));
     currentParams = DEFAULT_PARAMS;
     saveParameters();
@@ -752,7 +770,8 @@ void resetToDefaults() {
   showParameters();
 }
 
-bool validateParameters(unsigned short motorTime, unsigned short totalTime, unsigned short motorSpeed) {
+bool validateParameters(unsigned short motorTime, unsigned short totalTime, unsigned short motorSpeed,
+                       unsigned short dtRetracted, unsigned short dtDeployed, unsigned short dtDwell) {
   // Check individual parameter ranges
   if (motorTime < MIN_MOTOR_TIME || motorTime > MAX_MOTOR_TIME) {
     return false;
@@ -763,12 +782,21 @@ bool validateParameters(unsigned short motorTime, unsigned short totalTime, unsi
   if (motorSpeed < MIN_MOTOR_SPEED || motorSpeed > MAX_MOTOR_SPEED) {
     return false;
   }
-  
+  if (dtRetracted < 950 || dtRetracted > 2050) {
+    return false;
+  }
+  if (dtDeployed < 950 || dtDeployed > 2050) {
+    return false;
+  }
+  if (dtDwell < 1 || dtDwell > 60) {
+    return false;
+  }
+
   // Check logical relationship: motor time must be less than total time with margin
   if (motorTime >= totalTime - 5) {
     return false;
   }
-  
+
   return true;
 }
 
@@ -893,8 +921,71 @@ void processSerialCommand() {
     }
 
     case 'D': {
-      // Download flight records
-      downloadFlightRecords();
+      // Handle DT commands (DR, DD, DW) or Download (D)
+      if (command.length() >= 3 && command.substring(0, 2) == "DR") {
+        // DT Retracted position
+        if (command.length() < 4) {
+          Serial.println(F("[ERR] Format: DR <microseconds>"));
+          return;
+        }
+
+        int value = command.substring(3).toInt();
+        if (value < 950 || value > 2050) {
+          Serial.println(F("[ERR] DT retracted position out of range (950-2050)"));
+          return;
+        }
+
+        currentParams.dtRetracted = value;
+        saveParameters();
+
+        Serial.print(F("[OK] DT Retracted = "));
+        Serial.print(value);
+        Serial.println(F("us"));
+
+      } else if (command.length() >= 3 && command.substring(0, 2) == "DD") {
+        // DT Deployed position
+        if (command.length() < 4) {
+          Serial.println(F("[ERR] Format: DD <microseconds>"));
+          return;
+        }
+
+        int value = command.substring(3).toInt();
+        if (value < 950 || value > 2050) {
+          Serial.println(F("[ERR] DT deployed position out of range (950-2050)"));
+          return;
+        }
+
+        currentParams.dtDeployed = value;
+        saveParameters();
+
+        Serial.print(F("[OK] DT Deployed = "));
+        Serial.print(value);
+        Serial.println(F("us"));
+
+      } else if (command.length() >= 3 && command.substring(0, 2) == "DW") {
+        // DT Dwell time
+        if (command.length() < 4) {
+          Serial.println(F("[ERR] Format: DW <seconds>"));
+          return;
+        }
+
+        int value = command.substring(3).toInt();
+        if (value < 1 || value > 60) {
+          Serial.println(F("[ERR] DT dwell time out of range (1-60)"));
+          return;
+        }
+
+        currentParams.dtDwell = value;
+        saveParameters();
+
+        Serial.print(F("[OK] DT Dwell = "));
+        Serial.print(value);
+        Serial.println(F(" seconds"));
+
+      } else {
+        // Download flight records
+        downloadFlightRecords();
+      }
       break;
     }
 
@@ -942,6 +1033,15 @@ void showParameters() {
   } else {
     Serial.println(F("Not detected"));
   }
+  Serial.print(F("[INFO] DT Retracted: "));
+  Serial.print(currentParams.dtRetracted);
+  Serial.println(F("us"));
+  Serial.print(F("[INFO] DT Deployed: "));
+  Serial.print(currentParams.dtDeployed);
+  Serial.println(F("us"));
+  Serial.print(F("[INFO] DT Dwell: "));
+  Serial.print(currentParams.dtDwell);
+  Serial.println(F(" seconds"));
 }
 
 void showHelp() {
@@ -961,6 +1061,9 @@ void showHelp() {
   Serial.print(F("-"));
   Serial.print(MAX_MOTOR_SPEED);
   Serial.println(F(")"));
+  Serial.println(F("[INFO] DR <us>   - Set DT retracted position (950-2050)"));
+  Serial.println(F("[INFO] DD <us>   - Set DT deployed position (950-2050)"));
+  Serial.println(F("[INFO] DW <sec>  - Set DT dwell time (1-60)"));
   Serial.println(F("[INFO] G         - Get current parameters"));
   Serial.println(F("[INFO] R         - Reset to defaults"));
   Serial.println(F("[INFO] D         - Download flight records"));
