@@ -934,6 +934,14 @@ void showParameters() {
   Serial.println(F("us PWM)"));
   Serial.print(F("[INFO] Current Phase: "));
   Serial.println(getStateName(flightState));
+  Serial.print(F("[INFO] GPS Status: "));
+  if (gpsAvailable) {
+    Serial.print(F("Available ("));
+    Serial.print(positionCount);
+    Serial.println(F(" positions recorded)"));
+  } else {
+    Serial.println(F("Not detected"));
+  }
 }
 
 void showHelp() {

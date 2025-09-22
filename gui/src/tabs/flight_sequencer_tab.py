@@ -36,6 +36,15 @@ class FlightSequencerTab:
         self.downloading_data = False
         self.last_flight_data = None
 
+        # Single source of truth for flight parameters
+        self.current_flight_params = {
+            'motor_run_time': None,
+            'total_flight_time': None,
+            'motor_speed': None,
+            'current_phase': 'UNKNOWN',
+            'gps_state': 'UNKNOWN'
+        }
+
         # Create main tab frame
         self.frame = ttk.Frame(parent)
         
@@ -215,12 +224,10 @@ class FlightSequencerTab:
     def _get_parameters(self):
         """Get current parameters from FlightSequencer."""
         self._send_command("G")
-        # Schedule input field update after a brief delay to allow response
-        self.parent.after(1000, self._update_input_fields_from_monitor)
-        
+
     def _reset_parameters(self):
         """Reset parameters to defaults."""
-        if messagebox.askyesno("Reset Parameters", 
+        if messagebox.askyesno("Reset Parameters",
                               "Reset all parameters to factory defaults?"):
             self._send_command("R")
             
@@ -233,14 +240,14 @@ class FlightSequencerTab:
             
     def handle_serial_data(self, data):
         """Handle incoming serial data for FlightSequencer."""
-        # Update parameter monitor
-        self.param_monitor.process_serial_data(data)
-        
         # Display in serial monitor
         self.serial_monitor_widget.log_received(data)
-        
-        # Update flight status from [INFO] messages
-        self._update_flight_status(data)
+
+        # Update canonical parameter store from ANY Arduino response
+        self._update_parameter_store(data)
+
+        # Update GUI to reflect current parameter store
+        self._sync_gui_with_parameters()
 
         # Handle flight data download
         self._handle_flight_data_response(data)
@@ -249,17 +256,23 @@ class FlightSequencerTab:
     def handle_connection_change(self, connected):
         """Handle connection status changes."""
         if not connected:
-            # Clear parameters when disconnected
+            # Clear parameter store when disconnected
             self._clear_parameters()
         else:
             # On connection, automatically get current parameters and status
             self.parent.after(2500, self._get_parameters)  # Send G command after Arduino settles
 
     def _clear_parameters(self):
-        """Clear parameter display and input fields when disconnected."""
+        """Clear parameter store and GUI when disconnected."""
         def clear_params():
-            # Clear parameter monitor
-            self.param_monitor.clear_parameters()
+            # Clear canonical parameter store
+            self.current_flight_params = {
+                'motor_run_time': None,
+                'total_flight_time': None,
+                'motor_speed': None,
+                'current_phase': 'DISCONNECTED',
+                'gps_state': 'UNKNOWN'
+            }
 
             # Clear input fields
             self.motor_time_var.set("")
@@ -272,36 +285,81 @@ class FlightSequencerTab:
 
         self.parent.after(0, clear_params)
 
-    def _update_input_fields_from_monitor(self):
-        """Update input fields with current parameter monitor values (used on connection/get parameters)."""
-        def update_fields():
-            params = self.param_monitor.get_parameters()
-            if params:
-                if 'motor_run_time' in params:
-                    self.motor_time_var.set(str(params['motor_run_time']))
-                if 'total_flight_time' in params:
-                    self.flight_time_var.set(str(params['total_flight_time']))
-                if 'motor_speed' in params:
-                    self.motor_speed_var.set(str(params['motor_speed']))
 
-        self.parent.after(0, update_fields)
+    def _update_parameter_store(self, data):
+        """Update canonical parameter store from any Arduino response."""
+        # Motor Run Time patterns: "[INFO] Motor Run Time: 20 seconds" or "[OK] Motor Run Time = 12 seconds"
+        motor_time_match = re.search(r'Motor Run Time[:\s=]+(\d+)', data, re.IGNORECASE)
+        if motor_time_match:
+            self.current_flight_params['motor_run_time'] = int(motor_time_match.group(1))
 
-    def _update_flight_status(self, data):
-        """Update flight status from parameter monitor data."""
-        def update_status():
-            params = self.param_monitor.get_parameters()
+        # Total Flight Time patterns: "[INFO] Total Flight Time: 120 seconds"
+        flight_time_match = re.search(r'Total Flight Time[:\s=]+(\d+)', data, re.IGNORECASE)
+        if flight_time_match:
+            self.current_flight_params['total_flight_time'] = int(flight_time_match.group(1))
 
-            # Update phase
-            if 'current_phase' in params:
-                phase = params['current_phase']
-                self.current_phase_var.set(f"Phase: {phase}")
+        # Motor Speed patterns: "[INFO] Motor Speed: 150 (1500us PWM)" or "[OK] Motor Speed = 135"
+        motor_speed_match = re.search(r'Motor Speed[:\s=]+(\d+)', data, re.IGNORECASE)
+        if motor_speed_match:
+            self.current_flight_params['motor_speed'] = int(motor_speed_match.group(1))
 
-            # Update timer
-            if 'flight_timer' in params:
-                timer = params['flight_timer']
-                self.timer_var.set(f"Time: {timer}")
+        # Current Phase patterns: "[INFO] Current Phase: READY" or state transition messages
+        phase_match = re.search(r'Current Phase:\s*([A-Z_]+)', data, re.IGNORECASE)
+        if phase_match:
+            self.current_flight_params['current_phase'] = phase_match.group(1).upper()
+        else:
+            # State transition messages
+            if re.search(r'System ready|ready for new flight', data, re.IGNORECASE):
+                self.current_flight_params['current_phase'] = 'READY'
+            elif re.search(r'System ARMED', data, re.IGNORECASE):
+                self.current_flight_params['current_phase'] = 'ARMED'
+            elif re.search(r'LAUNCH.*Motor|Motor spooling', data, re.IGNORECASE):
+                self.current_flight_params['current_phase'] = 'MOTOR_SPOOL'
+            elif re.search(r'Motor at flight speed', data, re.IGNORECASE):
+                self.current_flight_params['current_phase'] = 'MOTOR_RUN'
+            elif re.search(r'Motor.*complete.*glide', data, re.IGNORECASE):
+                self.current_flight_params['current_phase'] = 'GLIDE'
+            elif re.search(r'deploying DT|Flight time complete', data, re.IGNORECASE):
+                self.current_flight_params['current_phase'] = 'DT_DEPLOY'
+            elif re.search(r'Dethermalizer DEPLOYED', data, re.IGNORECASE):
+                self.current_flight_params['current_phase'] = 'DT_DEPLOYED'
+            elif re.search(r'flight complete', data, re.IGNORECASE):
+                self.current_flight_params['current_phase'] = 'LANDING'
 
-        self.parent.after(0, update_status)
+        # GPS State patterns: "[INFO] GPS Status: Available" or "GPS Status: Not detected"
+        gps_status_match = re.search(r'GPS Status:\s*([^()\n]+)', data, re.IGNORECASE)
+        if gps_status_match:
+            gps_status = gps_status_match.group(1).strip()
+            if 'available' in gps_status.lower():
+                self.current_flight_params['gps_state'] = 'AVAILABLE'
+            elif 'not detected' in gps_status.lower():
+                self.current_flight_params['gps_state'] = 'NOT_DETECTED'
+            else:
+                self.current_flight_params['gps_state'] = gps_status.upper()
+
+    def _sync_gui_with_parameters(self):
+        """Update GUI fields to match canonical parameter store."""
+        def update_gui():
+            params = self.current_flight_params
+
+            # Update input fields with current parameter values
+            if params['motor_run_time'] is not None:
+                self.motor_time_var.set(str(params['motor_run_time']))
+
+            if params['total_flight_time'] is not None:
+                self.flight_time_var.set(str(params['total_flight_time']))
+
+            if params['motor_speed'] is not None:
+                self.motor_speed_var.set(str(params['motor_speed']))
+
+            # Update phase display
+            self.current_phase_var.set(f"Phase: {params['current_phase']}")
+
+            # Update GPS status display
+            self.gps_status_var.set(f"GPS: {params['gps_state']}")
+
+        self.parent.after(0, update_gui)
+
             
     def _download_flight_data(self):
         """Download flight records from Arduino."""

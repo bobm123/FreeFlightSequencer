@@ -34,9 +34,15 @@ The GPS autopilot system has been fully implemented and is ready for comprehensi
 ## Code Generation Guidelines
 
 ### Serial Output Character Set
-**IMPORTANT**: Avoid using special Unicode characters in Serial.print() and Serial.println() statements.
+**CRITICAL**: Never use Unicode characters anywhere in Arduino code - including Serial.print(), Serial.println(), and ALL COMMENTS.
 
-**Rationale**: While the Arduino IDE supports Unicode characters, future display devices (LCD displays, terminal emulators, embedded displays, etc.) may have limited character sets that cannot render special characters properly.
+**Rationale**: While the Arduino IDE supports Unicode characters, future display devices (LCD displays, terminal emulators, embedded displays, etc.) may have limited character sets that cannot render special characters properly. Unicode in comments can also cause compilation issues on different systems.
+
+**This applies to:**
+- All Serial.print() and Serial.println() statements
+- All code comments (// and /* */)
+- All string literals and constants
+- All variable names and function names
 
 **Examples:**
 ```cpp
@@ -174,6 +180,166 @@ The `ExpectedResults.txt` file should contain:
 - Statistical summaries and completion messages
 
 This standardized structure ensures consistent documentation, build capability, and validation reference for all device test applications.
+
+## Parameter Management Design Pattern
+
+### Overview
+For managing real-time parameters between Arduino applications and GUI tabs, use this proven single-source-of-truth architecture to avoid ad hoc response handling and ensure consistent GUI state.
+
+### Core Principles
+1. **Single Parameter Store** - One canonical source for each tab's parameter values
+2. **Comprehensive Response Parsing** - Parse ALL Arduino response formats that indicate parameter changes
+3. **Automatic GUI Sync** - GUI fields always reflect the current parameter store
+4. **Simple Commands** - Buttons send commands only, no response expectations
+
+### Implementation Pattern
+
+#### 1. Parameter Store Definition
+```python
+# Single source of truth for [TabName] parameters
+self.current_[tab]_params = {
+    'param1': None,
+    'param2': None,
+    'param3': None,
+    'current_state': 'UNKNOWN'
+}
+```
+
+#### 2. Serial Data Handler
+```python
+def handle_serial_data(self, data):
+    """Handle incoming serial data for [TabName]."""
+    # Display in serial monitor
+    self.serial_monitor_widget.log_received(data)
+
+    # Update canonical parameter store from ANY Arduino response
+    self._update_parameter_store(data)
+
+    # Update GUI to reflect current parameter store
+    self._sync_gui_with_parameters()
+
+    # Handle other responses (downloads, etc.)
+    self._handle_other_responses(data)
+```
+
+#### 3. Comprehensive Parameter Parsing
+```python
+def _update_parameter_store(self, data):
+    """Update canonical parameter store from any Arduino response."""
+    # Parse ALL possible formats for each parameter:
+    # "[INFO] Param1: 123" (from G command)
+    # "[OK] Param1 = 456" (from set command)
+    # "[WARN] Param1 out of range (10-100)" (extract limits)
+
+    param1_match = re.search(r'Param1[:\s=]+(\d+)', data, re.IGNORECASE)
+    if param1_match:
+        self.current_[tab]_params['param1'] = int(param1_match.group(1))
+
+    # State/phase detection from messages
+    if re.search(r'specific state message', data, re.IGNORECASE):
+        self.current_[tab]_params['current_state'] = 'STATE_NAME'
+```
+
+#### 4. Automatic GUI Synchronization
+```python
+def _sync_gui_with_parameters(self):
+    """Update GUI fields to match canonical parameter store."""
+    def update_gui():
+        params = self.current_[tab]_params
+
+        # Update input fields with current parameter values
+        if params['param1'] is not None:
+            self.param1_var.set(str(params['param1']))
+
+        # Update status displays
+        self.current_state_var.set(f"State: {params['current_state']}")
+
+    self.parent.after(0, update_gui)
+```
+
+#### 5. Simple Command Methods
+```python
+def _set_param1(self):
+    """Set param1 value."""
+    try:
+        value = self.param1_var.get().strip()
+        # Validate if needed
+        command = f"P1 {value}"
+        self._send_command(command)  # Just send command, automatic update
+    except ValueError as e:
+        messagebox.showerror("Invalid Value", str(e))
+
+def _get_parameters(self):
+    """Get current parameters."""
+    self._send_command("G")  # Just send command, no response handling
+
+def _reset_parameters(self):
+    """Reset parameters to defaults."""
+    if messagebox.askyesno("Reset", "Reset to defaults?"):
+        self._send_command("R")  # Just send command, automatic update
+```
+
+#### 6. Connection Handling
+```python
+def handle_connection_change(self, connected):
+    """Handle connection status changes."""
+    if not connected:
+        self._clear_parameters()
+    else:
+        # Auto-request current state after connection settles
+        self.parent.after(2500, self._get_parameters)
+
+def _clear_parameters(self):
+    """Clear parameter store and GUI when disconnected."""
+    def clear_params():
+        # Reset canonical parameter store
+        self.current_[tab]_params = {
+            'param1': None,
+            'param2': None,
+            'current_state': 'DISCONNECTED'
+        }
+        # Clear GUI fields
+        self.param1_var.set("")
+        self.current_state_var.set("State: DISCONNECTED")
+
+    self.parent.after(0, clear_params)
+```
+
+### Benefits of This Pattern
+- **Eliminates Race Conditions** - No timing dependencies between commands and responses
+- **Handles All Response Formats** - Comprehensive parsing catches any parameter mention
+- **Automatic GUI Updates** - No manual field updates needed
+- **Clean Command Logic** - Commands just send, responses automatically update
+- **Single Source of Truth** - Parameter values always consistent
+- **Easy to Extend** - Add new parameters by extending the store and parsing
+
+### Anti-Patterns to Avoid
+```python
+# BAD - Ad hoc response handling
+def _set_param(self):
+    self._send_command("P 123")
+    self.parent.after(1000, self._update_fields_maybe)  # Race condition
+
+# BAD - Command-specific response expectations
+def _reset_params(self):
+    self._send_command("R")
+    self.parent.after(1000, self._get_parameters)  # Double command
+
+# BAD - Manual field updates
+def handle_response(self, data):
+    if "OK Motor" in data:
+        self.motor_var.set("some_value")  # Inconsistent with other updates
+```
+
+### Implementation Checklist
+When adding this pattern to a new tab:
+- [ ] Define canonical parameter store dictionary
+- [ ] Implement comprehensive response parsing in `_update_parameter_store()`
+- [ ] Create automatic GUI sync in `_sync_gui_with_parameters()`
+- [ ] Simplify all command methods to just send commands
+- [ ] Handle connection changes with store clearing and auto-refresh
+- [ ] Test with all Arduino response formats (INFO, OK, ERR, etc.)
+- [ ] Verify GUI updates immediately on any parameter change
 
 ## Finite State Machine (FSM) Design Guidelines
 
