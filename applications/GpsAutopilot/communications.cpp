@@ -295,9 +295,9 @@ void Coms_ProcessServoCommand(const String& command) {
         actuatorParams.RollServoCenter = value;
         Serial.print(F("[SERVO] Center set to "));
         Serial.print(value);
-        Serial.println(F(" μs"));
+        Serial.println(F(" us"));
       } else {
-        Serial.println(F("[SERVO] Error: Center must be 1400-1600 μs"));
+        Serial.println(F("[SERVO] Error: Center must be 1400-1600 us"));
       }
     }
     else if (subCommand.startsWith("RANGE ")) {
@@ -306,9 +306,9 @@ void Coms_ProcessServoCommand(const String& command) {
         actuatorParams.RollServoRange = value;
         Serial.print(F("[SERVO] Range set to "));
         Serial.print(value);
-        Serial.println(F(" μs"));
+        Serial.println(F(" us"));
       } else {
-        Serial.println(F("[SERVO] Error: Range must be 200-600 μs"));
+        Serial.println(F("[SERVO] Error: Range must be 200-600 us"));
       }
     }
     else {
@@ -320,21 +320,21 @@ void Coms_ProcessServoCommand(const String& command) {
     Serial.println(F("[SERVO] Current Configuration:"));
     Serial.print(F("[SERVO] Center: "));
     Serial.print(actuatorParams.RollServoCenter);
-    Serial.println(F(" μs"));
+    Serial.println(F(" us"));
     Serial.print(F("[SERVO] Range: "));
     Serial.print(actuatorParams.RollServoRange);
-    Serial.println(F(" μs"));
+    Serial.println(F(" us"));
     Serial.print(F("[SERVO] Direction: "));
     Serial.println(actuatorParams.RollServoReversed ? F("Inverted") : F("Normal"));
     Serial.print(F("[SERVO] Min Pulse: "));
     Serial.print(actuatorParams.RollServoMinPulse);
-    Serial.println(F(" μs"));
+    Serial.println(F(" us"));
     Serial.print(F("[SERVO] Max Pulse: "));
     Serial.print(actuatorParams.RollServoMaxPulse);
-    Serial.println(F(" μs"));
+    Serial.println(F(" us"));
     Serial.print(F("[SERVO] Deadband: "));
     Serial.print(actuatorParams.RollServoDeadband);
-    Serial.println(F(" μs"));
+    Serial.println(F(" us"));
   }
   else {
     Serial.println(F("[SERVO] Error: Unknown command"));

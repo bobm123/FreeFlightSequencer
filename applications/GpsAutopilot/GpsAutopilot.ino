@@ -808,9 +808,9 @@ void reportGpsStatus() {
       // Show absolute GPS coordinates before datum is set
       Serial.print(F("Position: "));
       Serial.print(navState.datumLat, 6);
-      Serial.print(F("°, "));
+      Serial.print(F("deg, "));
       Serial.print(navState.datumLon, 6);
-      Serial.print(F("°, Alt: "));
+      Serial.print(F("deg, Alt: "));
       Serial.print(navState.altitude, 1);
       Serial.println(F("m"));
     }

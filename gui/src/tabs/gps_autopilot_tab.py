@@ -203,7 +203,7 @@ class GpsAutopilotTab:
         # Roll servo center
         center_frame = ttk.Frame(servo_tab)
         center_frame.pack(fill='x', padx=5, pady=2)
-        ttk.Label(center_frame, text="Center (μs):").pack(side='left')
+        ttk.Label(center_frame, text="Center (us):").pack(side='left')
         self.servo_center_var = tk.StringVar(value="1500")
         center_entry = ttk.Entry(center_frame, textvariable=self.servo_center_var, width=8)
         center_entry.pack(side='left', padx=5)
@@ -212,7 +212,7 @@ class GpsAutopilotTab:
         # Roll servo range
         range_frame = ttk.Frame(servo_tab)
         range_frame.pack(fill='x', padx=5, pady=2)
-        ttk.Label(range_frame, text="Range (μs):").pack(side='left')
+        ttk.Label(range_frame, text="Range (us):").pack(side='left')
         self.servo_range_var = tk.StringVar(value="400")
         range_entry = ttk.Entry(range_frame, textvariable=self.servo_range_var, width=8)
         range_entry.pack(side='left', padx=5)
@@ -223,7 +223,7 @@ class GpsAutopilotTab:
         servo_status_frame.pack(fill='x', padx=5, pady=5)
 
         # Current configuration display
-        self.servo_config_var = tk.StringVar(value="Config: Center=1500μs Range=400μs Dir=Normal")
+        self.servo_config_var = tk.StringVar(value="Config: Center=1500us Range=400us Dir=Normal")
         ttk.Label(servo_status_frame, textvariable=self.servo_config_var,
                  font=('Consolas', 9)).pack(padx=5, pady=2)
 
@@ -404,7 +404,7 @@ class GpsAutopilotTab:
         try:
             center = float(self.servo_center_var.get())
             if not (1400 <= center <= 1600):
-                raise ValueError("Center must be 1400-1600 μs")
+                raise ValueError("Center must be 1400-1600 us")
             self._send_command(f"SERVO SET CENTER {center}")
         except ValueError as e:
             messagebox.showerror("Invalid Value", str(e))
@@ -414,7 +414,7 @@ class GpsAutopilotTab:
         try:
             range_val = float(self.servo_range_var.get())
             if not (200 <= range_val <= 600):
-                raise ValueError("Range must be 200-600 μs")
+                raise ValueError("Range must be 200-600 us")
             self._send_command(f"SERVO SET RANGE {range_val}")
         except ValueError as e:
             messagebox.showerror("Invalid Value", str(e))
@@ -639,7 +639,7 @@ class GpsAutopilotTab:
                 center = self.servo_config_data['center']
                 range_val = self.servo_config_data['range']
                 direction = self.servo_config_data['direction']
-                config_text = f"Config: Center={center}μs Range={range_val}μs Dir={direction}"
+                config_text = f"Config: Center={center}us Range={range_val}us Dir={direction}"
                 self.servo_config_var.set(config_text)
 
                 # Reset update flag
@@ -652,7 +652,7 @@ class GpsAutopilotTab:
         center = self.servo_center_var.get()
         range_val = self.servo_range_var.get()
         direction = self.servo_direction_var.get()
-        config_text = f"Config: Center={center}μs Range={range_val}μs Dir={direction}"
+        config_text = f"Config: Center={center}us Range={range_val}us Dir={direction}"
         self.servo_config_var.set(config_text)
         
     def get_frame(self):

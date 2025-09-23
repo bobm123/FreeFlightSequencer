@@ -40,7 +40,7 @@ class TabManager:
                 r'GPS.*fix.*acquired',
                 r'Fix Status:.*\[OK\]',
                 r'Satellites:.*\d+.*tracked',
-                r'Position:.*\d+\.\d+.*°',
+                r'Position:.*\d+\.\d+.*deg',
                 r'NMEA Sentences:.*\d+',
                 r'\[GPS_RAW\]',
                 r'\[GPS_PARSE\]',

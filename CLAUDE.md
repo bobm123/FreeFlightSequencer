@@ -2,13 +2,13 @@
 
 This file contains important guidelines and constraints for AI-assisted code generation in this Arduino project.
 
-## 🚀 Current Project Status - Dual Flight Control System Complete
+## Current Project Status - Dual Flight Control System Complete
 
-### ✅ GPS Autopilot System (READY FOR FLIGHT TESTING)
+### GPS Autopilot System (READY FOR FLIGHT TESTING)
 The GPS autopilot system has been fully implemented and is ready for comprehensive testing:
 
 **Core Features Implemented:**
-- Complete state machine: READY → ARMED → MOTOR_SPOOL → GPS_GUIDED_FLIGHT → EMERGENCY/LANDING
+- Complete state machine: READY -> ARMED -> MOTOR_SPOOL -> GPS_GUIDED_FLIGHT -> EMERGENCY/LANDING
 - GPS-based navigation with NMEA parsing (supports GNGGA and GNRMC sentences)
 - Autonomous circular flight pattern around launch datum
 - Button-controlled progression (long press = ARM, short press = launch)
@@ -16,18 +16,18 @@ The GPS autopilot system has been fully implemented and is ready for comprehensi
 - GPS signal loss failsafe with configurable gentle turn and reduced power
 - Full GUI integration with real-time status display and parameter control
 
-### ✅ FlightSequencer System (PRODUCTION READY)
+### FlightSequencer System (PRODUCTION READY)
 Enhanced E36-Timer replacement with advanced data handling:
 
 **Core Features Implemented:**
-- Complete flight sequencing: READY → ARMED → MOTOR_SPOOL → MOTOR_RUN → GLIDE → DT_DEPLOY → LANDING
+- Complete flight sequencing: READY -> ARMED -> MOTOR_SPOOL -> MOTOR_RUN -> GLIDE -> DT_DEPLOY -> LANDING
 - GPS data logging with robust CSV parsing and error recovery
 - Parameter programming: motor time, flight time, motor speed, DT servo positions, dwell time
 - Emergency cutoff capability from all flight states
 - Multi-format data export: JSON, CSV, KML with flight path visualization
 - **LATEST**: Robust CSV parsing handles transmission line breaks in GPS coordinates
 
-### ✅ Unified GUI System (FULLY OPERATIONAL)
+### Unified GUI System (FULLY OPERATIONAL)
 Multi-tab interface managing both flight control systems:
 
 **Core Features Implemented:**
