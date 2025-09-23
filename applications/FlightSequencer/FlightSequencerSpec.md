@@ -138,6 +138,36 @@ This application replaces the original E36-Timer functionality with these key di
 - QtPY SAMD21 platform (vs. ATTiny85)
 - Hardcoded parameters (vs. EEPROM storage)
 
+## GUI Integration
+
+The FlightSequencer application integrates with a dedicated GUI tab that provides:
+
+### Real-time Parameter Control
+- Motor run time configuration (1-300 seconds)
+- Total flight time configuration (10-600 seconds)
+- Motor speed adjustment (95-200, corresponding to 950-2000us PWM)
+- DT servo position control (retracted/deployed positions in microseconds)
+- DT dwell time configuration (1-60 seconds)
+
+### Flight Data Management
+- GPS position recording during flight (if GPS module available)
+- Downloadable flight data in JSON format with CSV export capability
+- Flight path visualization with state timeline analysis
+- KML export for Google Earth visualization
+
+### Robust Data Download
+The GUI implements robust CSV parsing to handle transmission artifacts:
+- **Line break recovery**: Automatically merges GPS records split across transmission boundaries
+- **Incomplete coordinate detection**: Identifies malformed latitude/longitude values (e.g., lone "-" characters)
+- **Graceful error handling**: Skips corrupted records while preserving valid flight data
+- **Debug data preservation**: Saves problematic data for analysis when parsing failures occur
+
+### Status Monitoring
+- Real-time flight phase display
+- GPS availability and position count tracking
+- Parameter value synchronization with Arduino state
+- Emergency stop capability through GUI interface
+
 ## Future Enhancements (Phase 2)
 
 Phase 2 will add parameter programming capability:

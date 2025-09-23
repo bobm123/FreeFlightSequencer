@@ -2,7 +2,7 @@
 
 This file contains important guidelines and constraints for AI-assisted code generation in this Arduino project.
 
-## 🚀 Current Project Status - GPS Autopilot Implementation Complete
+## 🚀 Current Project Status - Dual Flight Control System Complete
 
 ### ✅ GPS Autopilot System (READY FOR FLIGHT TESTING)
 The GPS autopilot system has been fully implemented and is ready for comprehensive testing:
@@ -16,20 +16,40 @@ The GPS autopilot system has been fully implemented and is ready for comprehensi
 - GPS signal loss failsafe with configurable gentle turn and reduced power
 - Full GUI integration with real-time status display and parameter control
 
+### ✅ FlightSequencer System (PRODUCTION READY)
+Enhanced E36-Timer replacement with advanced data handling:
+
+**Core Features Implemented:**
+- Complete flight sequencing: READY → ARMED → MOTOR_SPOOL → MOTOR_RUN → GLIDE → DT_DEPLOY → LANDING
+- GPS data logging with robust CSV parsing and error recovery
+- Parameter programming: motor time, flight time, motor speed, DT servo positions, dwell time
+- Emergency cutoff capability from all flight states
+- Multi-format data export: JSON, CSV, KML with flight path visualization
+- **LATEST**: Robust CSV parsing handles transmission line breaks in GPS coordinates
+
+### ✅ Unified GUI System (FULLY OPERATIONAL)
+Multi-tab interface managing both flight control systems:
+
+**Core Features Implemented:**
+- Multi-application support with automatic tab switching
+- Real-time parameter synchronization from Arduino responses
+- Robust flight data download with automatic error recovery
+- Flight path visualization with matplotlib integration
+- Export capabilities: JSON, CSV, KML formats for analysis
+- **LATEST**: Fixed "could not convert string to float: '-'" parsing error
+
 **Hardware Configuration:**
 - QtPY SAMD21 + Signal Distribution MkII
 - Roll servo on A3, Motor ESC on A2, Button on A0, NeoPixel on pin 11
-- GPS module on Serial1 (TX/RX pins)
+- GPS module on Serial1 (TX/RX pins) - optional for FlightSequencer, required for GPS Autopilot
 
-**Ready for Testing:**
-1. Datum capture via long button press
-2. ARMED state verification
-3. Launch sequence (short button press)
-4. Autonomous flight monitoring
-5. Failsafe scenario testing
-6. Emergency procedures validation
+**Ready for Operation:**
+1. **GPS Autopilot**: Ready for flight testing of autonomous navigation
+2. **FlightSequencer**: Field-tested with robust data recovery capabilities
+3. **GUI Interface**: Handles both applications with comprehensive error handling
+4. **Data Analysis**: Complete flight data export and visualization pipeline
 
-**Last Working State:** GPS autopilot displays real-time position data, responds to GPS signal, and is ready for button press testing to advance through flight states.
+**Last Working State:** Both flight control systems operational with GUI providing comprehensive parameter control, real-time monitoring, and robust data export capabilities. CSV parsing robustness improvements ensure reliable flight data recovery even with transmission errors.
 
 ## Code Generation Guidelines
 
@@ -191,6 +211,32 @@ For managing real-time parameters between Arduino applications and GUI tabs, use
 2. **Comprehensive Response Parsing** - Parse ALL Arduino response formats that indicate parameter changes
 3. **Automatic GUI Sync** - GUI fields always reflect the current parameter store
 4. **Simple Commands** - Buttons send commands only, no response expectations
+
+### Recent Implementation Success: FlightSequencer CSV Parsing Robustness
+
+The FlightSequencer tab now includes advanced CSV parsing capabilities that handle real-world transmission issues:
+
+#### CSV Parsing Error Recovery
+- **Problem Solved**: GPS coordinates split across transmission boundaries (e.g., longitude `-77.196556` transmitted as `-` on one line, `77.196556` on next)
+- **Solution**: Multi-line record reassembly with coordinate validation
+- **Error Handling**: Gracefully skip corrupted records while preserving valid flight data
+- **Debug Support**: Automatic preservation of problematic data for analysis
+
+#### Implementation Example
+```python
+# Detect incomplete GPS records and merge with next line
+if line.startswith('GPS,'):
+    parts = line.split(',')
+    # Check for incomplete coordinate values (just a minus sign)
+    if len(parts) >= 6:
+        lat_field = parts[4] if len(parts) > 4 else ""
+        lon_field = parts[5] if len(parts) > 5 else ""
+        if lat_field in ["-", ""] or lon_field in ["-", ""]:
+            # Merge with next line to complete the record
+            merged_line = line + next_line.strip()
+```
+
+This pattern successfully resolved the "could not convert string to float: '-'" error and provides a template for handling similar transmission artifacts in other applications.
 
 ### Implementation Pattern
 

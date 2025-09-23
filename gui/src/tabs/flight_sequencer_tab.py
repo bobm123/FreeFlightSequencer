@@ -559,14 +559,70 @@ class FlightSequencerTab:
     def _process_downloaded_data(self):
         """Process and save downloaded flight data."""
         try:
-            # Parse CSV format from buffer
-            lines = self.flight_data_buffer.strip().split('\n')
+            # Parse CSV format from buffer - handle line breaks within records
+            raw_data = self.flight_data_buffer.strip()
+
+            # Remove carriage returns and normalize line endings
+            raw_data = raw_data.replace('\r\n', '\n').replace('\r', '\n')
+
+            # Reassemble any records that were split across lines
+            # Look for incomplete GPS records and join them with the next line
+            lines = raw_data.split('\n')
+            processed_lines = []
+            i = 0
+
+            while i < len(lines):
+                line = lines[i].strip()
+
+                # Skip empty lines and control markers
+                if not line or line.startswith('[') or line.startswith('DEBUG'):
+                    i += 1
+                    continue
+
+                # Check if this is an incomplete GPS record
+                if line.startswith('GPS,'):
+                    parts = line.split(',')
+
+                    # GPS records need 6 parts: GPS,timestamp,state,state_name,lat,lon
+                    # Also check if lat/lon fields look incomplete (contain only minus sign)
+                    is_incomplete = False
+
+                    if len(parts) < 6:
+                        is_incomplete = True
+                    elif len(parts) >= 6:
+                        # Check if latitude or longitude fields are incomplete
+                        lat_field = parts[4] if len(parts) > 4 else ""
+                        lon_field = parts[5] if len(parts) > 5 else ""
+
+                        # Check for incomplete coordinate values (just a minus sign or empty)
+                        if lat_field in ["-", ""] or lon_field in ["-", ""]:
+                            is_incomplete = True
+
+                    if is_incomplete:
+                        # This GPS record is incomplete, try to merge with next line
+                        if i + 1 < len(lines):
+                            next_line = lines[i + 1].strip()
+                            # Merge the lines
+                            merged_line = line + next_line
+                            processed_lines.append(merged_line)
+                            i += 2  # Skip both current and next line
+                        else:
+                            # Last line, can't merge
+                            processed_lines.append(line)
+                            i += 1
+                    else:
+                        # Complete GPS record
+                        processed_lines.append(line)
+                        i += 1
+                else:
+                    # Non-GPS line (HEADER, etc.)
+                    processed_lines.append(line)
+                    i += 1
 
             flight_header = None
             gps_records = []
 
-            for line in lines:
-                line = line.strip()
+            for line in processed_lines:
                 if line.startswith('HEADER,'):
                     # Parse header: HEADER,flight_id,duration_ms,gps_available,position_count,motor_run_time,total_flight_time,motor_speed
                     parts = line.split(',')
@@ -586,13 +642,18 @@ class FlightSequencerTab:
                     # Parse GPS record: GPS,timestamp_ms,flight_state,state_name,latitude,longitude
                     parts = line.split(',')
                     if len(parts) >= 6:
-                        gps_records.append({
-                            'timestamp_ms': int(parts[1]),
-                            'flight_state': int(parts[2]),
-                            'state_name': parts[3],
-                            'latitude': float(parts[4]),
-                            'longitude': float(parts[5])
-                        })
+                        try:
+                            gps_records.append({
+                                'timestamp_ms': int(parts[1]),
+                                'flight_state': int(parts[2]),
+                                'state_name': parts[3],
+                                'latitude': float(parts[4]),
+                                'longitude': float(parts[5])
+                            })
+                        except ValueError as ve:
+                            # Log problematic GPS record but continue processing
+                            print(f"Skipping malformed GPS record: {line} - Error: {ve}")
+                            continue
 
             if flight_header and gps_records:
                 # Create flight data structure

@@ -122,10 +122,16 @@ Building on existing FlightSequencer serial commands:
 
 **Core Commands** (Currently Implemented):
 - `M <sec>` - Set motor run time
-- `T <sec>` - Set total flight time  
+- `T <sec>` - Set total flight time
 - `S <speed>` - Set motor speed
+- `DR <us>` - Set DT retracted position (microseconds)
+- `DD <us>` - Set DT deployed position (microseconds)
+- `DW <sec>` - Set DT dwell time (seconds)
 - `G` - Get current parameters
 - `R` - Reset to defaults
+- `D J` - Download flight data in JSON format
+- `X` - Clear flight records
+- `STOP` - Emergency stop
 - `?` - Help
 
 **Response Format**:
@@ -141,9 +147,27 @@ Building on existing FlightSequencer serial commands:
 #### Data Packet Structure
 ```
 Command Packet:  [CMD]<space>[PARAMS]<LF>
-Response Packet: [STATUS]<space>[DATA]<LF> 
+Response Packet: [STATUS]<space>[DATA]<LF>
 Error Response:  [ERR]:[ERROR_MESSAGE]<LF>
 ```
+
+#### Flight Data Download Protocol
+```
+Download Request: D J<LF>
+Data Response:    [START_FLIGHT_DATA]
+                  HEADER,flight_id,duration_ms,gps_available,position_count,motor_run_time,total_flight_time,motor_speed
+                  GPS,timestamp_ms,flight_state,state_name,latitude,longitude
+                  GPS,timestamp_ms,flight_state,state_name,latitude,longitude
+                  ...
+                  [END_FLIGHT_DATA]
+```
+
+**Robust CSV Parsing Implementation**:
+- **Line Break Recovery**: Automatically detects and merges GPS records split across transmission boundaries
+- **Coordinate Validation**: Identifies incomplete coordinate values (e.g., longitude field containing only "-")
+- **Error Resilience**: Skips corrupted records while preserving valid flight data
+- **Debug Preservation**: Saves problematic raw data with timestamps for analysis
+- **Format Support**: Exports to JSON, CSV, and KML formats for analysis and visualization
 
 ### Technical Specifications
 
@@ -168,19 +192,20 @@ Error Response:  [ERR]:[ERROR_MESSAGE]<LF>
 
 ## Development Phases
 
-### Phase 1: Core Communication **[CURRENT FOCUS]**
-- **Serial Communication**: Robust PySerial implementation with auto-detection
-- **Command Protocol**: Full implementation of existing FlightSequencer commands
-- **Parameter Management**: Get/set/validate all flight parameters
-- **Error Handling**: Comprehensive communication error recovery
-- **Console Interface**: Command-line tool for testing communication
-- **Basic Configuration**: JSON-based settings persistence
+### Phase 1: Core Communication **[COMPLETED]**
+- **Serial Communication**: Robust PySerial implementation with auto-detection ✓
+- **Command Protocol**: Full implementation of existing FlightSequencer commands ✓
+- **Parameter Management**: Get/set/validate all flight parameters ✓
+- **Error Handling**: Comprehensive communication error recovery ✓
+- **Flight Data Download**: Robust CSV parsing with line-break recovery ✓
+- **Multi-Tab Interface**: Support for multiple Arduino applications ✓
 
 **Deliverables**:
-- Working serial communication library
-- Command-line parameter configuration tool
-- Automated tests with actual FlightSequencer hardware
-- Documentation of communication protocol
+- Working serial communication library ✓
+- Multi-tab GUI with FlightSequencer and GPS Autopilot support ✓
+- Robust flight data download with CSV/JSON/KML export ✓
+- Flight path visualization with matplotlib integration ✓
+- Comprehensive error handling and debug data preservation ✓
 
 ### Phase 2: Desktop GUI with Field Operation Focus **[HIGH PRIORITY]**
 - **Cross-Platform GUI**: Tkinter or PyQt implementation for Windows/macOS/Linux
