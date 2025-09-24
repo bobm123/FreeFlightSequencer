@@ -35,6 +35,27 @@ class ArduinoControlCenter:
         self.root.title("Arduino Control Center v2.0")
         self.root.geometry("1200x800")
         self.root.minsize(800, 600)
+
+        # Set window icon (will be set after GUI creation for better compatibility)
+        self.icon_path = None
+        try:
+            # Get path to bird.ico - find gui directory from current file location
+            current_file = os.path.abspath(__file__)
+            # From gui/src/gui/multi_tab_gui.py go up to gui/ directory
+            gui_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
+            icon_path = os.path.join(gui_dir, "bird.ico")
+
+            if os.path.exists(icon_path):
+                self.icon_path = icon_path
+            else:
+                # Try alternative path (run from different directories)
+                alt_icon_path = os.path.join(os.path.dirname(current_file), "..", "..", "..", "bird.ico")
+                alt_icon_path = os.path.abspath(alt_icon_path)
+                if os.path.exists(alt_icon_path):
+                    self.icon_path = alt_icon_path
+
+        except Exception as e:
+            pass  # Continue without icon
         
         # Application state
         self.current_app = ApplicationType.UNKNOWN
@@ -43,7 +64,10 @@ class ArduinoControlCenter:
         # Create GUI
         self._create_widgets()
         self._setup_callbacks()
-        
+
+        # Set window icon after GUI is fully created
+        self._set_window_icon()
+
         # Start periodic updates
         self._start_periodic_updates()
         
@@ -189,6 +213,22 @@ class ArduinoControlCenter:
         """Start periodic update tasks."""
         self._update_time_display()
         self._check_connection_health()
+
+    def _set_window_icon(self):
+        """Set the window icon for Windows compatibility."""
+        if not self.icon_path or not os.path.exists(self.icon_path):
+            return
+
+        try:
+            # Primary method - should work on Windows
+            self.root.iconbitmap(self.icon_path)
+        except Exception:
+            try:
+                # Fallback method for Windows
+                self.root.wm_iconbitmap(self.icon_path)
+            except Exception:
+                # If all else fails, continue without icon
+                pass
         
     def _update_time_display(self):
         """Update time display in status bar."""

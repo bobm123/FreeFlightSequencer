@@ -50,13 +50,29 @@ class FlightSequencerTab:
 
         # Create main tab frame
         self.frame = ttk.Frame(parent)
-        
+
+        # Configure emergency button style
+        self._setup_styles()
+
         self._create_widgets()
         
         # Register with tab manager
         from core.tab_manager import ApplicationType
         tab_manager.register_tab(ApplicationType.FLIGHT_SEQUENCER, self.handle_serial_data)
-        
+
+    def _setup_styles(self):
+        """Configure custom styles for the tab."""
+        try:
+            style = ttk.Style()
+            # Create emergency button style with red background
+            style.configure("Emergency.TButton",
+                          background="#ff4444",
+                          foreground="white",
+                          font=('TkDefaultFont', 9, 'bold'))
+        except Exception:
+            # If style configuration fails, continue without custom styling
+            pass
+
     def _create_widgets(self):
         """Create FlightSequencer interface widgets."""
         # Create paned window for resizable layout
@@ -148,13 +164,17 @@ class FlightSequencerTab:
         # Action buttons
         action_frame = ttk.Frame(param_frame)
         action_frame.pack(fill='x', padx=5, pady=5)
-        
-        ttk.Button(action_frame, text="Get Parameters", 
+
+        ttk.Button(action_frame, text="Get Parameters",
                   command=self._get_parameters).pack(side='left', padx=2)
-        ttk.Button(action_frame, text="Reset Defaults", 
+        ttk.Button(action_frame, text="Reset Defaults",
                   command=self._reset_parameters).pack(side='left', padx=2)
-        ttk.Button(action_frame, text="Emergency Stop", 
-                  command=self._emergency_stop).pack(side='right', padx=2)
+
+        # Parameter file management buttons
+        ttk.Button(action_frame, text="Save Parameters",
+                  command=self._save_parameters_to_file).pack(side='right', padx=2)
+        ttk.Button(action_frame, text="Load Parameters",
+                  command=self._load_parameters_from_file).pack(side='right', padx=2)
 
     def _create_flight_data_controls(self, parent):
         """Create flight data download and management controls."""
@@ -201,6 +221,14 @@ class FlightSequencerTab:
         timer_label = ttk.Label(status_frame, textvariable=self.timer_var,
                               font=('TkDefaultFont', 14, 'bold'))
         timer_label.pack(pady=10)
+
+        # Emergency stop button in flight status box
+        emergency_frame = ttk.Frame(status_frame)
+        emergency_frame.pack(fill='x', padx=5, pady=10)
+
+        ttk.Button(emergency_frame, text="Emergency Stop",
+                  command=self._emergency_stop,
+                  style="Emergency.TButton").pack()
 
         # Flight statistics - removed misleading flight count
             
@@ -909,6 +937,95 @@ class FlightSequencerTab:
             messagebox.showinfo("Success", f"KML exported to:\n{file_path}")
         else:
             messagebox.showinfo("Cancelled", "KML export cancelled by user.")
+
+    def _save_parameters_to_file(self):
+        """Save current flight parameters to a JSON file."""
+        try:
+            # Collect current parameters from the GUI fields
+            params = {
+                'motor_run_time': self.motor_time_var.get().strip() or None,
+                'total_flight_time': self.flight_time_var.get().strip() or None,
+                'motor_speed': self.motor_speed_var.get().strip() or None,
+                'dt_retracted': self.dt_retracted_var.get().strip() or None,
+                'dt_deployed': self.dt_deployed_var.get().strip() or None,
+                'dt_dwell': self.dt_dwell_var.get().strip() or None,
+                'saved_timestamp': datetime.now().isoformat(),
+                'application': 'FlightSequencer'
+            }
+
+            # Filter out None values for cleaner JSON
+            params = {k: v for k, v in params.items() if v is not None}
+
+            # Create parameters directory if it doesn't exist
+            params_dir = os.path.join(os.getcwd(), "parameters")
+            os.makedirs(params_dir, exist_ok=True)
+
+            # Default filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_filename = f"FlightSequencer_params_{timestamp}.json"
+            initial_file_path = os.path.join(params_dir, default_filename)
+
+            # Ask user for file location
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".json",
+                filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+                initialfile=initial_file_path,
+                parent=self.parent,
+                title="Save Flight Parameters"
+            )
+
+            if file_path:
+                with open(file_path, 'w') as f:
+                    json.dump(params, f, indent=2)
+                messagebox.showinfo("Success", f"Parameters saved to:\n{file_path}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save parameters:\n{str(e)}")
+
+    def _load_parameters_from_file(self):
+        """Load flight parameters from a JSON file."""
+        try:
+            # Look in parameters directory first
+            params_dir = os.path.join(os.getcwd(), "parameters")
+
+            file_path = filedialog.askopenfilename(
+                filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+                initialdir=params_dir if os.path.exists(params_dir) else os.getcwd(),
+                parent=self.parent,
+                title="Load Flight Parameters"
+            )
+
+            if file_path:
+                with open(file_path, 'r') as f:
+                    params = json.load(f)
+
+                # Validate that this is a FlightSequencer parameter file
+                if params.get('application') != 'FlightSequencer':
+                    if not messagebox.askyesno("Warning",
+                        "This file may not be FlightSequencer parameters.\nLoad anyway?"):
+                        return
+
+                # Load parameters into GUI fields
+                if 'motor_run_time' in params:
+                    self.motor_time_var.set(str(params['motor_run_time']))
+                if 'total_flight_time' in params:
+                    self.flight_time_var.set(str(params['total_flight_time']))
+                if 'motor_speed' in params:
+                    self.motor_speed_var.set(str(params['motor_speed']))
+                if 'dt_retracted' in params:
+                    self.dt_retracted_var.set(str(params['dt_retracted']))
+                if 'dt_deployed' in params:
+                    self.dt_deployed_var.set(str(params['dt_deployed']))
+                if 'dt_dwell' in params:
+                    self.dt_dwell_var.set(str(params['dt_dwell']))
+
+                # Show success message with loaded parameters count
+                param_count = len([k for k in params.keys() if k not in ['saved_timestamp', 'application']])
+                messagebox.showinfo("Success",
+                    f"Loaded {param_count} parameters from:\n{os.path.basename(file_path)}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load parameters:\n{str(e)}")
 
     def get_frame(self):
         """Get the main tab frame."""
