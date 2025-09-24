@@ -77,6 +77,8 @@ void setup() {
   while (!Serial) {
     ; // Wait for serial port to connect
   }
+
+  Serial.println(F("[APP] ServoTest"));
   
   // Initialize button
   pinMode(BUTTON_PIN, INPUT_PULLUP);

@@ -196,6 +196,7 @@ void setup() {
 
   Serial.println(F("[INFO] GpsAutopilot starting..."));
   Serial.println(F("[INFO] GPS-guided autonomous flight controller"));
+  Serial.println(F("[APP] GpsAutopilot"));
 
   // Load parameters from FlashStorage
   loadParameters();
@@ -905,6 +906,7 @@ void saveParameters() {
 }
 
 void showParameters() {
+  Serial.println(F("[APP] GpsAutopilot"));
   Serial.println(F("[INFO] Current GpsAutopilot Parameters"));
   Serial.print(F("[INFO] Orbit Radius: "));
   Serial.print(currentParams.control.OrbitRadius);

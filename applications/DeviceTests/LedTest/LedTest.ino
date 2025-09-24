@@ -62,6 +62,8 @@ void setup() {
   while (!Serial) {
     ; // Wait for serial port to connect (Leonardo/Micro compatibility)
   }
+
+  Serial.println(F("[APP] LedTest"));
   
   // Initialize NeoPixel
   pixel.begin();

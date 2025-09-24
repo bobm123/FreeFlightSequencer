@@ -83,6 +83,7 @@ void setup() {
     ; // Wait up to 3 seconds for serial connection
   }
   
+  Serial.println(F("[APP] GpsTest"));
   Serial.println(F("[INFO] GPS Test starting..."));
   Serial.println(F("[INFO] Testing GPS module on Serial1 at 9600 baud"));
   Serial.println(F("[INFO] GPS-TX should be connected to Qt Py D6 (Serial1 RX)"));

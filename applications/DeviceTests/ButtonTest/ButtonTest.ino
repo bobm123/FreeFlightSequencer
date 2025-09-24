@@ -50,6 +50,8 @@ void setup() {
   while (!Serial) {
     ; // Wait for serial port to connect (Leonardo/Micro compatibility)
   }
+
+  Serial.println(F("[APP] ButtonTest"));
   
   // Initialize button pin
   pinMode(BUTTON_PIN, INPUT_PULLUP);

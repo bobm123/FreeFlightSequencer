@@ -80,6 +80,8 @@ void setup() {
   while (!Serial) {
     ; // Wait for serial port to connect
   }
+
+  Serial.println(F("[APP] LedButton"));
   
   // Initialize button pin
   pinMode(BUTTON_PIN, INPUT_PULLUP);

@@ -196,6 +196,7 @@ void setup() {
   
   Serial.println(F("[INFO] FlightSequencer starting..."));
   Serial.println(F("[INFO] Phase 2: Serial parameter programming"));
+  Serial.println(F("[APP] FlightSequencer"));
   
   // Load parameters from FlashStorage
   loadParameters();
@@ -1011,6 +1012,7 @@ void processSerialCommand() {
 }
 
 void showParameters() {
+  Serial.println(F("[APP] FlightSequencer"));
   Serial.println(F("[INFO] Current Parameters"));
   Serial.print(F("[INFO] Motor Run Time: "));
   Serial.print(currentParams.motorRunTime);
