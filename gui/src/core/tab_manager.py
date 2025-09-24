@@ -27,12 +27,16 @@ class TabManager:
         self.last_detection_time = 0
         self.detection_patterns = {
             ApplicationType.FLIGHT_SEQUENCER: [
+                r'\[APP\] FlightSequencer',
+                r'FlightSequencer.*starting',
                 r'FlightSequencer.*ready',
                 r'Motor Run Time.*\d+',
                 r'Total Flight Time.*\d+',
                 r'Phase.*COMPLETE'
             ],
             ApplicationType.GPS_AUTOPILOT: [
+                r'\[APP\] GpsAutopilot',
+                r'GpsAutopilot.*starting',
                 r'GpsAutopilot.*initialized',
                 r'GPS Status Report',
                 r'Navigation.*datum.*set',
@@ -49,6 +53,11 @@ class TabManager:
                 r'NAV.*Navigation.*system'
             ],
             ApplicationType.DEVICE_TEST: [
+                r'\[APP\] ButtonTest',
+                r'\[APP\] LedTest',
+                r'\[APP\] ServoTest',
+                r'\[APP\] GpsTest',
+                r'\[APP\] LedButton',
                 r'Device.*Test.*Suite',
                 r'Running.*test.*\w+',
                 r'Test.*PASS|FAIL',
