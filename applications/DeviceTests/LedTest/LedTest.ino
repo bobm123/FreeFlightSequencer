@@ -64,6 +64,17 @@ void setup() {
   }
 
   Serial.println(F("[APP] LedTest"));
+
+  // Report board identification
+  #if defined(ADAFRUIT_QTPY_M0)
+    Serial.println(F("[BOARD] Adafruit QtPY SAMD21 (QTPY_M0)"));
+  #elif defined(ARDUINO_SAMD_QTPY_M0)
+    Serial.println(F("[BOARD] Adafruit QtPY SAMD21 (SAMD_QTPY_M0)"));
+  #elif defined(ARDUINO_ARCH_SAMD)
+    Serial.println(F("[BOARD] SAMD21 Compatible Board"));
+  #else
+    Serial.println(F("[BOARD] Unknown Arduino Board"));
+  #endif
   
   // Initialize NeoPixel
   pixel.begin();

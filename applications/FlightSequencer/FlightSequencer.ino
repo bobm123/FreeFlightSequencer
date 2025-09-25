@@ -1,40 +1,35 @@
 /*
- * FlightSequencer.ino - E36 Flight Timer for QtPY SAMD21
- * 
+ * FlightSequencer.ino - E36 Flight Timer for Qt Py Multi-Board Support
+ *
  * Automated flight control system for electric free-flight model aircraft.
- * Ported from ATTiny85 E36-Timer to QtPY SAMD21 with Signal Distribution MkII.
- * 
- * Hardware Requirements:
- * - Adafruit QT Py SAMD21 microcontroller
+ * Ported from ATTiny85 E36-Timer to Qt Py boards with Signal Distribution MkII.
+ *
+ * Supported Hardware:
+ * - Adafruit Qt Py SAMD21 or ESP32-S3 microcontroller
  * - Signal Distribution MkII carrier board
  * - Motor ESC with BEC connected to ESC0 (pin A2)
  * - Dethermalizer servo connected to CH1 (pin A3)
  * - Push button (onboard tactile switch on A0)
  * - NeoPixel LED (onboard on pin 11)
- * 
+ *
  * Flight Sequence:
  * 1. Ready: Heartbeat LED, wait for button press
  * 2. Armed: Fast LED flash, release button to start
- * 3. Motor Spool: LED on, ramp motor to speed  
+ * 3. Motor Spool: LED on, ramp motor to speed
  * 4. Motor Run: LED on, motor at speed for 20 seconds
  * 5. Glide: LED slow blink, motor off until 120 seconds total
  * 6. DT Deploy: Deploy dethermalizer servo
  * 7. Landing: Slow blink, hold button 3+ seconds to reset
- * 
+ *
  * Original Authors: Stew Meyers (PicAXE), Bob Marchese (ATTiny85)
- * QtPY Port: Phase 2 with serial parameter programming
+ * Qt Py Port: Phase 2 with serial parameter programming and multi-board support
  */
 
 #include <Arduino.h>
-#include <Servo.h>
-#include <Adafruit_NeoPixel.h>
-#include <FlashStorage.h>
+#include "board_config.h"
+#include "storage_hal.h"
 
-// Hardware pin definitions (QtPY SAMD21 via Signal Distribution MkII)
-const int DT_SERVO_PIN = A3;         // Dethermalizer servo (CH1 connector)
-const int MOTOR_SERVO_PIN = A2;      // Motor ESC (ESC0 connector)
-const int BUTTON_PIN = A0;           // Push button (onboard switch)
-const int NEOPIXEL_PIN = 11;         // NeoPixel LED (onboard)
+// Pin definitions are now in board_config.h
 
 // Servo objects
 Servo dtServo;
@@ -97,8 +92,14 @@ const unsigned long GPS_RECORD_INTERVAL = 1000; // Record GPS every 1 second
 unsigned long dtDeployTime = 0;
 const unsigned long POST_DT_RECORD_TIME = 60000; // Record for 60 seconds after DT deployment
 
-// FlashStorage instance
+// Storage abstraction for both SAMD21 (FlashStorage) and ESP32-S3 (Preferences)
+#ifdef HAS_FLASH_STORAGE
 FlashStorage(flash_store, FlightParameters);
+#endif
+
+#ifdef HAS_PREFERENCES
+Preferences preferences;
+#endif
 
 // Parameter validation ranges
 const unsigned short MIN_MOTOR_TIME = 5;
@@ -197,8 +198,12 @@ void setup() {
   Serial.println(F("[INFO] FlightSequencer starting..."));
   Serial.println(F("[INFO] Phase 2: Serial parameter programming"));
   Serial.println(F("[APP] FlightSequencer"));
+
+  // Report board identification (from board_config.h)
+  Serial.print(F("[BOARD] "));
+  Serial.println(F(BOARD_NAME));
   
-  // Load parameters from FlashStorage
+  // Load parameters from storage (FlashStorage or Preferences)
   loadParameters();
 
   // Initialize flight timing
@@ -272,8 +277,15 @@ void loop() {
 }
 
 void initializeSystem() {
+  // Initialize NeoPixel power control (ESP32-S2 and other boards)
+#if defined(NEOPIXEL_POWER)
+  pinMode(NEOPIXEL_POWER, OUTPUT);
+  digitalWrite(NEOPIXEL_POWER, HIGH);
+#endif
+
   // Initialize NeoPixel
   pixel.begin();
+  pixel.setBrightness(64); // Set reasonable brightness (25% of max)
   pixel.clear();
   pixel.show();
   
@@ -734,9 +746,86 @@ void printTimestampedInfo(const __FlashStringHelper* message) {
   Serial.println(message);
 }
 
+// Storage HAL implementation
+bool initStorage() {
+#ifdef HAS_PREFERENCES
+  return preferences.begin("flight_params", false);
+#else
+  return true; // FlashStorage doesn't need initialization
+#endif
+}
+
+FlightParameters loadParametersFromStorage() {
+#ifdef HAS_FLASH_STORAGE
+  return flash_store.read();
+#elif defined(HAS_PREFERENCES)
+  FlightParameters params;
+
+  // Set defaults first
+  params.motorRunTime = 20;
+  params.totalFlightTime = 120;
+  params.motorSpeed = 150;
+  params.dtRetracted = 1100;
+  params.dtDeployed = 1900;
+  params.dtDwell = 5;
+  params.valid = true;
+
+  // Read from preferences if available
+  if (preferences.isKey("motorRunTime")) {
+    params.motorRunTime = preferences.getUShort("motorRunTime", 20);
+    params.totalFlightTime = preferences.getUShort("totalFlightTime", 120);
+    params.motorSpeed = preferences.getUShort("motorSpeed", 150);
+    params.dtRetracted = preferences.getUShort("dtRetracted", 1100);
+    params.dtDeployed = preferences.getUShort("dtDeployed", 1900);
+    params.dtDwell = preferences.getUShort("dtDwell", 5);
+    params.valid = preferences.getBool("valid", true);
+  }
+
+  return params;
+#else
+  FlightParameters params;
+  params.valid = false;
+  return params;
+#endif
+}
+
+bool saveParametersToStorage(const FlightParameters& params) {
+#ifdef HAS_FLASH_STORAGE
+  flash_store.write(params);
+  return true;
+#elif defined(HAS_PREFERENCES)
+  bool success = true;
+  success &= (preferences.putUShort("motorRunTime", params.motorRunTime) > 0);
+  success &= (preferences.putUShort("totalFlightTime", params.totalFlightTime) > 0);
+  success &= (preferences.putUShort("motorSpeed", params.motorSpeed) > 0);
+  success &= (preferences.putUShort("dtRetracted", params.dtRetracted) > 0);
+  success &= (preferences.putUShort("dtDeployed", params.dtDeployed) > 0);
+  success &= (preferences.putUShort("dtDwell", params.dtDwell) > 0);
+  success &= (preferences.putBool("valid", params.valid) > 0);
+  return success;
+#else
+  return false;
+#endif
+}
+
+bool isStorageValid() {
+#ifdef HAS_FLASH_STORAGE
+  FlightParameters params = flash_store.read();
+  return params.valid;
+#elif defined(HAS_PREFERENCES)
+  return preferences.isKey("valid") && preferences.getBool("valid", false);
+#else
+  return false;
+#endif
+}
+
 void loadParameters() {
-  currentParams = flash_store.read();
-  
+  // Initialize storage
+  initStorage();
+
+  // Load parameters using HAL
+  currentParams = loadParametersFromStorage();
+
   // If parameters are not valid or this is first boot, use defaults
   if (!currentParams.valid ||
       !validateParameters(currentParams.motorRunTime,
@@ -749,14 +838,25 @@ void loadParameters() {
     currentParams = DEFAULT_PARAMS;
     saveParameters();
   } else {
+#ifdef HAS_FLASH_STORAGE
     Serial.println(F("[INFO] Parameters loaded from flash memory"));
+#elif defined(HAS_PREFERENCES)
+    Serial.println(F("[INFO] Parameters loaded from preferences"));
+#endif
   }
 }
 
 void saveParameters() {
   currentParams.valid = true;
-  flash_store.write(currentParams);
-  Serial.println(F("[OK] Parameters saved to flash memory"));
+  if (saveParametersToStorage(currentParams)) {
+#ifdef HAS_FLASH_STORAGE
+    Serial.println(F("[OK] Parameters saved to flash memory"));
+#elif defined(HAS_PREFERENCES)
+    Serial.println(F("[OK] Parameters saved to preferences"));
+#endif
+  } else {
+    Serial.println(F("[ERR] Failed to save parameters"));
+  }
 }
 
 void resetToDefaults() {
@@ -1013,6 +1113,8 @@ void processSerialCommand() {
 
 void showParameters() {
   Serial.println(F("[APP] FlightSequencer"));
+  Serial.print(F("[BOARD] "));
+  Serial.println(F(BOARD_NAME));
   Serial.println(F("[INFO] Current Parameters"));
   Serial.print(F("[INFO] Motor Run Time: "));
   Serial.print(currentParams.motorRunTime);

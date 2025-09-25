@@ -84,6 +84,18 @@ void setup() {
   }
   
   Serial.println(F("[APP] GpsTest"));
+
+  // Report board identification
+  #if defined(ADAFRUIT_QTPY_M0)
+    Serial.println(F("[BOARD] Adafruit QtPY SAMD21 (QTPY_M0)"));
+  #elif defined(ARDUINO_SAMD_QTPY_M0)
+    Serial.println(F("[BOARD] Adafruit QtPY SAMD21 (SAMD_QTPY_M0)"));
+  #elif defined(ARDUINO_ARCH_SAMD)
+    Serial.println(F("[BOARD] SAMD21 Compatible Board"));
+  #else
+    Serial.println(F("[BOARD] Unknown Arduino Board"));
+  #endif
+
   Serial.println(F("[INFO] GPS Test starting..."));
   Serial.println(F("[INFO] Testing GPS module on Serial1 at 9600 baud"));
   Serial.println(F("[INFO] GPS-TX should be connected to Qt Py D6 (Serial1 RX)"));
