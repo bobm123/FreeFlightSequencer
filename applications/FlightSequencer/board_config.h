@@ -36,6 +36,15 @@
   #define MEMORY_FLASH_KB 256
   #define MEMORY_RAM_KB 32
 
+#elif defined(ARDUINO_ARCH_CH32V)
+  #define BOARD_NAME "Adafruit Qt Py CH32V203"
+  #define BOARD_TYPE_CH32V203
+  #define HAS_FLASH_STORAGE 1
+  #define HAS_NEOPIXEL 1
+  #define HAS_HARDWARE_SERIAL 1
+  #define MEMORY_FLASH_KB 256
+  #define MEMORY_RAM_KB 10
+
 #elif defined(ARDUINO_ARCH_ESP32)
   #define BOARD_NAME "ESP32 Compatible Board"
   #define BOARD_TYPE_ESP32

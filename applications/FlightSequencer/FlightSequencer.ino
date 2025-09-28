@@ -322,6 +322,10 @@ int executeReadyState(int currentState) {
   
   // Heartbeat LED pattern
   updateLED(LED_HEARTBEAT, currentTime);
+
+  // Ensure servos still safe initial positions
+  dtServo.writeMicroseconds(currentParams.dtRetracted);  // DT retracted
+  motorServo.writeMicroseconds(MIN_SPEED * 10);          // Motor idle
   
   // Check for arming (requires long press)
   if (longPressDetected) {
@@ -403,6 +407,9 @@ int executeMotorSpoolState(int currentState) {
     spoolStateEntered = true;
   }
   
+  // Ensure DT retracted
+  dtServo.writeMicroseconds(currentParams.dtRetracted);
+
   // Check for emergency shutoff during spool
   if (buttonJustPressed) {
     motorServo.writeMicroseconds(MIN_SPEED * 10);
@@ -449,9 +456,10 @@ int executeMotorRunState(int currentState) {
   // LED on during motor run
   updateLED(LED_SOLID_RED, currentTime);
   
-  // Maintain motor at flight speed
+  // Maintain motor at flight speed, keep DT retracted
   motorServo.writeMicroseconds(currentParams.motorSpeed * 10);
-  
+  dtServo.writeMicroseconds(currentParams.dtRetracted);
+
   if (!runStateEntered) {
     // Serial.println(F("[DEBUG] Entered Motor Run State"));
     runStateEntered = true;
@@ -483,8 +491,9 @@ int executeGlideState(int currentState) {
   // Slow LED blink (1 second cycle)
   updateLED(LED_SLOW_BLINK, currentTime);
   
-  // Ensure motor stays idle
+  // Ensure motor stays idle and DT retracted
   motorServo.writeMicroseconds(MIN_SPEED * 10);
+  dtServo.writeMicroseconds(currentParams.dtRetracted);
   
   // Check for emergency cutoff during glide (abort flight, no DT deployment)
   if (buttonJustPressed) {
