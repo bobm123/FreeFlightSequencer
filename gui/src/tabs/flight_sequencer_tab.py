@@ -199,7 +199,7 @@ class FlightSequencerTab:
                   command=self._download_flight_data).pack(side='left', padx=2)
         ttk.Button(download_frame, text="Clear Records",
                   command=self._clear_flight_records).pack(side='left', padx=2)
-        ttk.Button(download_frame, text="View Flight Path",
+        ttk.Button(download_frame, text="View Flight Path / Open File",
                   command=self._view_flight_path).pack(side='right', padx=2)
 
     def _create_status_display(self, parent):
@@ -532,8 +532,18 @@ class FlightSequencerTab:
     def _view_flight_path(self):
         """Open flight path visualization window."""
         if not hasattr(self, 'last_flight_data') or not self.last_flight_data:
-            messagebox.showinfo("No Data", "No flight data available. Download flight data first.")
-            return
+            # No current data available, offer to load from file
+            response = messagebox.askyesno(
+                "No Flight Data",
+                "No flight data available.\n\nWould you like to open an existing flight data file?"
+            )
+            if response:
+                self._load_flight_data_from_file()
+                # Check if data was successfully loaded
+                if not hasattr(self, 'last_flight_data') or not self.last_flight_data:
+                    return  # User cancelled or file load failed
+            else:
+                return  # User chose not to load file
 
         self._create_flight_path_window()
 
@@ -667,16 +677,35 @@ class FlightSequencerTab:
                             }
                         }
                 elif line.startswith('GPS,'):
-                    # Parse GPS record: GPS,timestamp_ms,flight_state,state_name,latitude,longitude
+                    # Parse GPS record: GPS,timestamp_ms,flight_state,state_name,latitude,longitude,altitude
                     parts = line.split(',')
-                    if len(parts) >= 6:
+                    if len(parts) >= 7:
+                        try:
+                            altitude_val = float(parts[6])
+                            gps_records.append({
+                                'timestamp_ms': int(parts[1]),
+                                'flight_state': int(parts[2]),
+                                'state_name': parts[3],
+                                'latitude': float(parts[4]),
+                                'longitude': float(parts[5]),
+                                'altitude': altitude_val
+                            })
+                            # Debug: Print first few altitude values to help diagnose
+                            if len(gps_records) <= 3:
+                                print(f"[DEBUG] GPS record {len(gps_records)}: Alt={altitude_val}m, Raw parts: {parts[:7]}")
+                        except (ValueError, IndexError) as e:
+                            # Handle parsing errors gracefully
+                            continue
+                    elif len(parts) >= 6:
+                        # Fallback for older format without altitude
                         try:
                             gps_records.append({
                                 'timestamp_ms': int(parts[1]),
                                 'flight_state': int(parts[2]),
                                 'state_name': parts[3],
                                 'latitude': float(parts[4]),
-                                'longitude': float(parts[5])
+                                'longitude': float(parts[5]),
+                                'altitude': 0.0  # Default altitude if not available
                             })
                         except ValueError as ve:
                             # Log problematic GPS record but continue processing
@@ -751,6 +780,7 @@ class FlightSequencerTab:
         try:
             import matplotlib.pyplot as plt
             from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+            from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
             import numpy as np
         except ImportError:
             messagebox.showerror("Missing Package",
@@ -761,7 +791,25 @@ class FlightSequencerTab:
         # Create visualization window
         viz_window = tk.Toplevel(self.parent)
         viz_window.title("Flight Path Visualization")
-        viz_window.geometry("800x600")
+        viz_window.geometry("900x700")
+
+        # Create File menu
+        menubar = tk.Menu(viz_window)
+        viz_window.config(menu=menubar)
+
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Save Plot as PNG", command=lambda: self._save_plot_as_png())
+        file_menu.add_command(label="Save Plot as PDF", command=lambda: self._save_plot_as_pdf())
+        file_menu.add_separator()
+        file_menu.add_command(label="Export CSV", command=lambda: self._export_csv())
+        file_menu.add_command(label="Export KML", command=lambda: self._export_kml())
+        file_menu.add_separator()
+        file_menu.add_command(label="Close", command=viz_window.destroy)
+
+        # Store figure reference for saving
+        self.current_figure = None
+        self.current_viz_window = viz_window
 
         # Create matplotlib figure
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
@@ -776,8 +824,20 @@ class FlightSequencerTab:
         times = [p['timestamp_ms'] / 1000.0 for p in positions]  # Convert to seconds
         lats = [p['latitude'] for p in positions]
         lons = [p['longitude'] for p in positions]
+        alts = [p.get('altitude', 0.0) for p in positions]  # Get altitude with fallback
         states = [p['flight_state'] for p in positions]
         state_names = [p['state_name'] for p in positions]
+
+        # Debug: Print altitude statistics
+        if alts:
+            min_alt, max_alt = min(alts), max(alts)
+            avg_alt = sum(alts) / len(alts)
+            non_zero_alts = [a for a in alts if a != 0.0]
+            print(f"[DEBUG] Altitude data: {len(positions)} points, Range: {min_alt:.1f}-{max_alt:.1f}m, Avg: {avg_alt:.1f}m, Non-zero: {len(non_zero_alts)}")
+            if len(non_zero_alts) > 0:
+                print(f"[DEBUG] First 5 altitudes: {alts[:5]}")
+            else:
+                print(f"[DEBUG] WARNING: All altitude values are zero! Check GPS data source.")
 
         # Plot 1: Flight path map
         scatter = ax1.scatter(lons, lats, c=times, cmap='viridis', s=50)
@@ -803,21 +863,50 @@ class FlightSequencerTab:
 
         ax1.legend()
 
-        # Plot 2: Timeline
-        ax2.plot(times, states, 'b-', linewidth=2, marker='o')
+        # Plot 2: Altitude over time
+        ax2.plot(times, alts, 'g-', linewidth=2, marker='o', markersize=4)
         ax2.set_xlabel('Time (seconds)')
-        ax2.set_ylabel('Flight State')
-        ax2.set_title('Flight State Timeline')
+        ax2.set_ylabel('Altitude (meters)')
+        ax2.set_title('Altitude Over Time')
         ax2.grid(True, alpha=0.3)
-        ax2.set_yticks([1, 2, 3, 4, 5, 6, 7, 99])
-        ax2.set_yticklabels(['Ready', 'Armed', 'Spool', 'Motor', 'Glide', 'DT', 'Post-DT', 'Land'])
+
+        # Add state background colors to altitude plot
+        state_colors = {3: 'red', 4: 'orange', 5: 'lightgreen', 6: 'purple', 7: 'lightblue'}
+        current_state = None
+        state_start_time = None
+
+        for i, (time, state) in enumerate(zip(times, states)):
+            if state != current_state:
+                if current_state is not None and current_state in state_colors:
+                    # Fill previous state period
+                    ax2.axvspan(state_start_time, time, alpha=0.2, color=state_colors[current_state])
+                current_state = state
+                state_start_time = time
+
+        # Fill last state period
+        if current_state is not None and current_state in state_colors and times:
+            ax2.axvspan(state_start_time, times[-1], alpha=0.2, color=state_colors[current_state])
+
+        # Add legend for state colors
+        state_labels = {3: 'Motor Spool', 4: 'Motor Run', 5: 'Glide', 6: 'DT Deploy', 7: 'Post-DT'}
+        legend_elements = [plt.Rectangle((0,0),1,1, facecolor=state_colors[s], alpha=0.2, label=state_labels[s])
+                          for s in state_colors if s in states]
+        if legend_elements:
+            ax2.legend(handles=legend_elements, loc='upper right')
 
         plt.tight_layout()
+
+        # Store figure reference for saving
+        self.current_figure = fig
 
         # Embed in tkinter
         canvas = FigureCanvasTkAgg(fig, viz_window)
         canvas.draw()
         canvas.get_tk_widget().pack(fill='both', expand=True)
+
+        # Add toolbar for zooming and panning
+        toolbar = NavigationToolbar2Tk(canvas, viz_window)
+        toolbar.update()
 
         # Add export button frame
         export_frame = ttk.Frame(viz_window)
@@ -860,7 +949,7 @@ class FlightSequencerTab:
             with open(file_path, 'w', newline='') as csvfile:
                 writer = csv.writer(csvfile)
                 writer.writerow(['Time_Seconds', 'Flight_State', 'State_Name',
-                               'Latitude', 'Longitude'])
+                               'Latitude', 'Longitude', 'Altitude_Meters'])
 
                 for pos in positions:
                     writer.writerow([
@@ -868,7 +957,8 @@ class FlightSequencerTab:
                         pos['flight_state'],
                         pos['state_name'],
                         pos['latitude'],
-                        pos['longitude']
+                        pos['longitude'],
+                        pos.get('altitude', 0.0)
                     ])
 
             # CSV exported successfully - no message needed
@@ -923,7 +1013,8 @@ class FlightSequencerTab:
 """
 
             for pos in positions:
-                kml_content += f"          {pos['longitude']},{pos['latitude']},0\n"
+                alt = pos.get('altitude', 0.0)
+                kml_content += f"          {pos['longitude']},{pos['latitude']},{alt}\n"
 
             kml_content += """        </coordinates>
       </LineString>
@@ -937,6 +1028,141 @@ class FlightSequencerTab:
             messagebox.showinfo("Success", f"KML exported to:\n{file_path}")
         else:
             messagebox.showinfo("Cancelled", "KML export cancelled by user.")
+
+    def _save_plot_as_png(self):
+        """Save the current plot as PNG."""
+        if not hasattr(self, 'current_figure') or self.current_figure is None:
+            messagebox.showwarning("No Plot", "No plot available to save")
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"flight_plot_{timestamp}.png"
+
+        # Create flightdata directory if it doesn't exist
+        flightdata_dir = os.path.join(os.getcwd(), "flightdata")
+        os.makedirs(flightdata_dir, exist_ok=True)
+        initial_file_path = os.path.join(flightdata_dir, filename)
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".png",
+            filetypes=[("PNG files", "*.png"), ("All files", "*.*")],
+            initialfile=initial_file_path,
+            parent=self.current_viz_window,
+            title="Save Plot as PNG"
+        )
+
+        if file_path:
+            try:
+                self.current_figure.savefig(file_path, dpi=300, bbox_inches='tight')
+                messagebox.showinfo("Success", f"Plot saved to:\n{file_path}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save plot:\n{str(e)}")
+
+    def _save_plot_as_pdf(self):
+        """Save the current plot as PDF."""
+        if not hasattr(self, 'current_figure') or self.current_figure is None:
+            messagebox.showwarning("No Plot", "No plot available to save")
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"flight_plot_{timestamp}.pdf"
+
+        # Create flightdata directory if it doesn't exist
+        flightdata_dir = os.path.join(os.getcwd(), "flightdata")
+        os.makedirs(flightdata_dir, exist_ok=True)
+        initial_file_path = os.path.join(flightdata_dir, filename)
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".pdf",
+            filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+            initialfile=initial_file_path,
+            parent=self.current_viz_window,
+            title="Save Plot as PDF"
+        )
+
+        if file_path:
+            try:
+                self.current_figure.savefig(file_path, bbox_inches='tight')
+                messagebox.showinfo("Success", f"Plot saved to:\n{file_path}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save plot:\n{str(e)}")
+
+    def _load_flight_data_from_file(self):
+        """Load flight data from an existing JSON file."""
+        # Create flightdata directory reference for initial directory
+        flightdata_dir = os.path.join(os.getcwd(), "flightdata")
+        initial_dir = flightdata_dir if os.path.exists(flightdata_dir) else os.getcwd()
+
+        file_path = filedialog.askopenfilename(
+            title="Open Flight Data File",
+            initialdir=initial_dir,
+            filetypes=[
+                ("JSON files", "*.json"),
+                ("All files", "*.*")
+            ]
+        )
+
+        if not file_path:
+            return  # User cancelled
+
+        try:
+            with open(file_path, 'r') as f:
+                loaded_data = json.load(f)
+
+            # Validate that this is flight data (has required structure)
+            if not isinstance(loaded_data, dict):
+                raise ValueError("File does not contain valid flight data structure")
+
+            if 'flight_header' not in loaded_data or 'position_records' not in loaded_data:
+                raise ValueError("File does not contain required flight data fields (flight_header, position_records)")
+
+            # Validate position records structure
+            position_records = loaded_data.get('position_records', [])
+            if not isinstance(position_records, list):
+                raise ValueError("Position records must be a list")
+
+            # Check if we have any position records
+            if not position_records:
+                raise ValueError("No GPS position records found in file")
+
+            # Validate sample record structure
+            sample_record = position_records[0]
+            required_fields = ['timestamp_ms', 'flight_state', 'state_name', 'latitude', 'longitude']
+            missing_fields = [field for field in required_fields if field not in sample_record]
+            if missing_fields:
+                raise ValueError(f"GPS records missing required fields: {', '.join(missing_fields)}")
+
+            # Data is valid, store it
+            self.last_flight_data = loaded_data
+
+            # Update UI to show loaded data info
+            flight_header = loaded_data.get('flight_header', {})
+            record_count = len(position_records)
+
+            # Show success message with file info
+            file_name = os.path.basename(file_path)
+            messagebox.showinfo(
+                "Flight Data Loaded",
+                f"Successfully loaded flight data from:\n{file_name}\n\n"
+                f"Records: {record_count} GPS positions\n"
+                f"Duration: {position_records[-1]['timestamp_ms'] / 1000.0:.1f} seconds"
+            )
+
+        except json.JSONDecodeError as e:
+            messagebox.showerror(
+                "Invalid File Format",
+                f"The selected file is not valid JSON:\n{str(e)}"
+            )
+        except ValueError as e:
+            messagebox.showerror(
+                "Invalid Flight Data",
+                f"The selected file does not contain valid flight data:\n{str(e)}"
+            )
+        except Exception as e:
+            messagebox.showerror(
+                "Error Loading File",
+                f"Failed to load flight data file:\n{str(e)}"
+            )
 
     def _save_parameters_to_file(self):
         """Save current flight parameters to a JSON file."""

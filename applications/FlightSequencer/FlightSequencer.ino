@@ -1302,6 +1302,12 @@ bool parseNMEASentence(String sentence) {
   int endPos = 0;
   String fields[15];
 
+  // Debug raw sentence if enabled
+  if (gpsDebugOutput && sentence.length() > 20) {
+    Serial.print(F("[DEBUG] NMEA: "));
+    Serial.println(sentence.substring(0, 80));  // Show first 80 chars
+  }
+
   // Split sentence by commas
   for (int i = 0; i < sentence.length() && commaCount < 15; i++) {
     if (sentence.charAt(i) == ',' || i == sentence.length() - 1) {
@@ -1343,6 +1349,21 @@ bool parseNMEASentence(String sentence) {
   // Parse altitude (field[9] in meters above sea level)
   if (commaCount > 9 && fields[9].length() > 0) {
     currentAlt = fields[9].toFloat();
+    if (gpsDebugOutput) {
+      Serial.print(F("[DEBUG] Alt field: '"));
+      Serial.print(fields[9]);
+      Serial.print(F("' -> "));
+      Serial.println(currentAlt, 1);
+    }
+  } else {
+    currentAlt = 0.0;  // Set to 0 if no altitude data available
+    if (gpsDebugOutput) {
+      Serial.print(F("[DEBUG] No altitude data - fields: "));
+      Serial.print(commaCount);
+      Serial.print(F(", field[9]: '"));
+      Serial.print(commaCount > 9 ? fields[9] : "N/A");
+      Serial.println(F("'"));
+    }
   }
 
   return true;
