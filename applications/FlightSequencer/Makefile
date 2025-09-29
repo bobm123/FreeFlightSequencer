@@ -1,9 +1,9 @@
 # Arduino configuration
 # SAMD21 Qt Py (original platform)
-#BOARD = adafruit:samd:adafruit_qtpy_m0
+BOARD = adafruit:samd:adafruit_qtpy_m0
 
 # ESP32-S2 Qt Py (multi-board support)
-BOARD = esp32:esp32:adafruit_qtpy_esp32s2
+#BOARD = esp32:esp32:adafruit_qtpy_esp32s2
 
 # Project files
 SKETCH = FlightSequencer.ino

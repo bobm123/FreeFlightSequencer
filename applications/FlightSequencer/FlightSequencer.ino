@@ -42,6 +42,7 @@ Adafruit_NeoPixel pixel(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 struct GPSPosition {
   float latitude;
   float longitude;
+  float altitude;           // Altitude in meters above sea level
   unsigned long timestamp;  // Flight time in milliseconds
   int flightState;
   bool valid;
@@ -75,22 +76,24 @@ FlightParameters currentParams;
 // GPS tracking variables
 bool gpsAvailable = false;
 bool gpsInitialized = false;
+bool gpsDebugOutput = false;  // P command toggle for GPS debug
 float currentLat = 0.0;
 float currentLon = 0.0;
+float currentAlt = 0.0;
 int gpsQuality = 0;
 int satelliteCount = 0;
+String gpsBuffer = "";  // Buffer for non-blocking GPS parsing
+unsigned long lastGPSDetectAttempt = 0;
 
-// Position storage (limited by SAMD21 memory)
-// Motor(10s) + Glide(90s) + Post-DT(60s) = 160 positions at 1Hz
-const int MAX_GPS_POSITIONS = 180;
+// Position storage for 5 minutes at 1Hz recording rate
+// Total flight time ~300 seconds at 1Hz = 300 positions maximum
+const int MAX_GPS_POSITIONS = 320; // Safety margin for 5+ minutes at 1Hz
 GPSPosition flightPath[MAX_GPS_POSITIONS];
 int positionCount = 0;
 unsigned long lastGPSRecord = 0;
-const unsigned long GPS_RECORD_INTERVAL = 1000; // Record GPS every 1 second
 
-// Post-DT GPS recording
+// DT deployment tracking
 unsigned long dtDeployTime = 0;
-const unsigned long POST_DT_RECORD_TIME = 60000; // Record for 60 seconds after DT deployment
 
 // Storage abstraction for both SAMD21 (FlashStorage) and ESP32-S3 (Preferences)
 #ifdef HAS_FLASH_STORAGE
@@ -167,13 +170,14 @@ int executeDTDeployState(int currentState);
 int executeLandingState(int currentState);
 
 // GPS function prototypes
-void detectGPS();
+void initializeGPS();
 void processGPSData();
 bool parseNMEASentence(String sentence);
 void recordPosition();
 void clearFlightRecords();
 void downloadFlightRecords();
 const char* getStateName(int state);
+unsigned long getGPSRecordInterval(int state);
 
 // Serial parameter programming functions
 void loadParameters();
@@ -209,8 +213,8 @@ void setup() {
   // Initialize flight timing
   flightStartTime = millis();
 
-  // Detect and initialize GPS
-  detectGPS();
+  // Initialize GPS serial port only
+  initializeGPS();
 
   // Initialize hardware
   initializeSystem();
@@ -227,7 +231,7 @@ void loop() {
     processSerialCommand();
   }
 
-  // Process GPS data (non-blocking)
+  // Process GPS data (non-blocking) and detect GPS if not available
   processGPSData();
 
   // Update button state with press/release detection
@@ -331,8 +335,12 @@ int executeReadyState(int currentState) {
   if (longPressDetected) {
     armTime = millis();
     longPressDetected = false; // Clear the flag
-    printTimestampedInfo(F("System ARMED - short press to launch"));
-    
+
+    // Reset GPS recording for new flight (start at index 0)
+    positionCount = 0;
+    lastGPSRecord = 0;
+    printTimestampedInfo(F("System ARMED - GPS recording started"));
+
     // Clear button flags after processing
     buttonJustPressed = false;
     buttonJustReleased = false;
@@ -388,9 +396,7 @@ void resetStateVariables() {
   runStateEntered = false;
   dtDeployed = false;
 
-  // Clear GPS flight path for new flight
-  positionCount = 0;
-  lastGPSRecord = 0;
+  // Reset DT deploy tracking (GPS recording continues throughout flight)
   dtDeployTime = 0;
 
   // Serial.println(F("[DEBUG] State variables reset for new flight"));
@@ -1030,6 +1036,14 @@ void processSerialCommand() {
       break;
     }
 
+    case 'P': {
+      // Toggle GPS debug output
+      gpsDebugOutput = !gpsDebugOutput;
+      Serial.print(F("[OK] GPS debug output "));
+      Serial.println(gpsDebugOutput ? F("enabled") : F("disabled"));
+      break;
+    }
+
     case 'D': {
       // Handle DT commands (DR, DD, DW) or Download (D)
       if (command.length() >= 3 && command.substring(0, 2) == "DR") {
@@ -1179,6 +1193,7 @@ void showHelp() {
   Serial.println(F("[INFO] DW <sec>  - Set DT dwell time (1-60)"));
   Serial.println(F("[INFO] G         - Get current parameters"));
   Serial.println(F("[INFO] R         - Reset to defaults"));
+  Serial.println(F("[INFO] P         - Toggle GPS debug output"));
   Serial.println(F("[INFO] D         - Download flight records"));
   Serial.println(F("[INFO] X         - Clear flight records"));
   Serial.println(F("[INFO] ?         - Show this help"));
@@ -1193,51 +1208,88 @@ void showHelp() {
 
 // GPS Functions
 
-void detectGPS() {
+void initializeGPS() {
   Serial1.begin(9600);
-  delay(100);
-
-  Serial.println(F("[INFO] Detecting GPS module..."));
-
-  unsigned long startTime = millis();
-  while (millis() - startTime < 2000) {  // 2 second detection window
-    if (Serial1.available()) {
-      String line = Serial1.readStringUntil('\n');
-      if (line.startsWith("$GN") || line.startsWith("$GP")) {
-        gpsAvailable = true;
-        Serial.println(F("[INFO] GPS module detected on Serial1"));
-        return;
-      }
-    }
-  }
-  Serial.println(F("[INFO] No GPS detected - continuing without GPS"));
+  Serial.println(F("[INFO] GPS serial port initialized at 9600 baud"));
+  lastGPSDetectAttempt = millis();
 }
 
 void processGPSData() {
-  if (!gpsAvailable || !Serial1.available()) return;
-
-  String sentence = Serial1.readStringUntil('\n');
-  if (sentence.startsWith("$GNGGA") || sentence.startsWith("$GPGGA")) {
-    if (parseNMEASentence(sentence)) {
-      // Record position during active flight states with timing interval
-      bool shouldRecord = false;
-
-      // Record during active flight phases (Motor Spool through DT Deploy)
-      if ((flightState >= 3 && flightState <= 6) &&
-          (millis() - lastGPSRecord > GPS_RECORD_INTERVAL)) {
-        shouldRecord = true;
+  // Handle GPS detection if not yet available (retry every 5 seconds)
+  if (!gpsAvailable && (millis() - lastGPSDetectAttempt > 5000)) {
+    lastGPSDetectAttempt = millis();
+    // Check for GPS data without blocking
+    if (Serial1.available()) {
+      // Read a few characters to check for NMEA sentences
+      String testData = "";
+      int charCount = 0;
+      while (Serial1.available() && charCount < 20) {
+        char c = Serial1.read();
+        testData += c;
+        charCount++;
+        if (c == '\n') break;
       }
-
-      // Continue recording for 1 minute after DT deployment (Landing state)
-      if (flightState == 99 && dtDeployTime > 0 &&
-          (millis() - dtDeployTime < POST_DT_RECORD_TIME) &&
-          (millis() - lastGPSRecord > GPS_RECORD_INTERVAL)) {
-        shouldRecord = true;
+      if (testData.indexOf("$GN") >= 0 || testData.indexOf("$GP") >= 0) {
+        gpsAvailable = true;
+        Serial.println(F("[INFO] GPS module detected on Serial1"));
       }
+    }
+  }
 
-      if (shouldRecord) {
-        recordPosition();
-        lastGPSRecord = millis();
+  if (!gpsAvailable) return;
+
+  // Non-blocking GPS data processing
+  while (Serial1.available()) {
+    char c = Serial1.read();
+
+    if (c == '\n' || c == '\r') {
+      // Complete sentence received
+      if (gpsBuffer.length() > 0) {
+        if (gpsBuffer.startsWith("$GNGGA") || gpsBuffer.startsWith("$GPGGA")) {
+          if (parseNMEASentence(gpsBuffer)) {
+            // Debug output if enabled
+            if (gpsDebugOutput) {
+              Serial.print(F("[GPS] Lat: "));
+              Serial.print(currentLat, 6);
+              Serial.print(F(", Lon: "));
+              Serial.print(currentLon, 6);
+              Serial.print(F(", Alt: "));
+              Serial.print(currentAlt, 1);
+              Serial.print(F("m, Sats: "));
+              Serial.print(satelliteCount);
+              Serial.print(F(", Quality: "));
+              Serial.println(gpsQuality);
+            }
+
+            // Record position from Armed state until Ready state (or memory full)
+            bool shouldRecord = false;
+
+            // Get recording interval for current state
+            unsigned long currentInterval = getGPSRecordInterval(flightState);
+
+            // Record during all flight phases: Armed through Landing (states 2-99)
+            // Stop recording when returning to Ready state (1)
+            if ((flightState >= 2 && flightState <= 99) &&
+                (millis() - lastGPSRecord > currentInterval) &&
+                (positionCount < MAX_GPS_POSITIONS)) {
+              shouldRecord = true;
+            }
+
+            if (shouldRecord) {
+              recordPosition();
+              lastGPSRecord = millis();
+            }
+          }
+        }
+        gpsBuffer = "";  // Clear buffer for next sentence
+      }
+    } else {
+      // Add character to buffer
+      gpsBuffer += c;
+
+      // Prevent buffer overflow
+      if (gpsBuffer.length() > 120) {
+        gpsBuffer = "";  // Reset if sentence too long
       }
     }
   }
@@ -1288,26 +1340,25 @@ bool parseNMEASentence(String sentence) {
     if (fields[5] == "W") currentLon = -currentLon;
   }
 
+  // Parse altitude (field[9] in meters above sea level)
+  if (commaCount > 9 && fields[9].length() > 0) {
+    currentAlt = fields[9].toFloat();
+  }
+
   return true;
 }
 
 void recordPosition() {
   if (positionCount >= MAX_GPS_POSITIONS) return;
 
-  unsigned long flightElapsed = millis() - startTime;
+  // Use time elapsed from arming (when GPS recording started)
+  unsigned long recordingElapsed = millis() - armTime;
 
   flightPath[positionCount].latitude = currentLat;
   flightPath[positionCount].longitude = currentLon;
-  flightPath[positionCount].timestamp = flightElapsed;
-
-  // Use special state code for post-DT recording period
-  if (flightState == 99 && dtDeployTime > 0 &&
-      (millis() - dtDeployTime < POST_DT_RECORD_TIME)) {
-    flightPath[positionCount].flightState = 7; // POST_DT_DESCENT
-  } else {
-    flightPath[positionCount].flightState = flightState;
-  }
-
+  flightPath[positionCount].altitude = currentAlt;
+  flightPath[positionCount].timestamp = recordingElapsed;
+  flightPath[positionCount].flightState = flightState;
   flightPath[positionCount].valid = true;
 
   positionCount++;
@@ -1358,7 +1409,9 @@ void downloadFlightRecords() {
     Serial.print(F(","));
     Serial.print(flightPath[i].latitude, 6);
     Serial.print(F(","));
-    Serial.println(flightPath[i].longitude, 6);
+    Serial.print(flightPath[i].longitude, 6);
+    Serial.print(F(","));
+    Serial.println(flightPath[i].altitude, 1);
 
     // Small delay every 10 records to prevent buffer overflow
     if (i % 10 == 9) {
@@ -1384,4 +1437,9 @@ const char* getStateName(int state) {
     case 99: return "LANDING";
     default: return "UNKNOWN";
   }
+}
+
+unsigned long getGPSRecordInterval(int state) {
+  // GPS data arrives at ~1Hz, so record at 1Hz for all states
+  return 1000; // 1Hz (1000ms interval) for all recording states
 }
