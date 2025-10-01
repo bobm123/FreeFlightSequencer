@@ -1264,13 +1264,10 @@ void processGPSData() {
             // Record position from Armed state until Ready state (or memory full)
             bool shouldRecord = false;
 
-            // Get recording interval for current state
-            unsigned long currentInterval = getGPSRecordInterval(flightState);
-
             // Record during all flight phases: Armed through Landing (states 2-99)
             // Stop recording when returning to Ready state (1)
             if ((flightState >= 2 && flightState <= 99) &&
-                (millis() - lastGPSRecord > currentInterval) &&
+                (millis() - lastGPSRecord > 1000) &&
                 (positionCount < MAX_GPS_POSITIONS)) {
               shouldRecord = true;
             }
@@ -1303,10 +1300,10 @@ bool parseNMEASentence(String sentence) {
   String fields[15];
 
   // Debug raw sentence if enabled
-  if (gpsDebugOutput && sentence.length() > 20) {
-    Serial.print(F("[DEBUG] NMEA: "));
-    Serial.println(sentence.substring(0, 80));  // Show first 80 chars
-  }
+  //if (gpsDebugOutput && sentence.length() > 20) {
+  //  Serial.print(F("[DEBUG] NMEA: "));
+  //  Serial.println(sentence.substring(0, 80));  // Show first 80 chars
+  //}
 
   // Split sentence by commas
   for (int i = 0; i < sentence.length() && commaCount < 15; i++) {
@@ -1349,21 +1346,21 @@ bool parseNMEASentence(String sentence) {
   // Parse altitude (field[9] in meters above sea level)
   if (commaCount > 9 && fields[9].length() > 0) {
     currentAlt = fields[9].toFloat();
-    if (gpsDebugOutput) {
-      Serial.print(F("[DEBUG] Alt field: '"));
-      Serial.print(fields[9]);
-      Serial.print(F("' -> "));
-      Serial.println(currentAlt, 1);
-    }
+    //if (gpsDebugOutput) {
+    //  Serial.print(F("[DEBUG] Alt field: '"));
+    //  Serial.print(fields[9]);
+    //  Serial.print(F("' -> "));
+    //  Serial.println(currentAlt, 1);
+    //}
   } else {
     currentAlt = 0.0;  // Set to 0 if no altitude data available
-    if (gpsDebugOutput) {
-      Serial.print(F("[DEBUG] No altitude data - fields: "));
-      Serial.print(commaCount);
-      Serial.print(F(", field[9]: '"));
-      Serial.print(commaCount > 9 ? fields[9] : "N/A");
-      Serial.println(F("'"));
-    }
+    //if (gpsDebugOutput) {
+    //  Serial.print(F("[DEBUG] No altitude data - fields: "));
+    //  Serial.print(commaCount);
+    //  Serial.print(F(", field[9]: '"));
+    //  Serial.print(commaCount > 9 ? fields[9] : "N/A");
+    //  Serial.println(F("'"));
+    //}
   }
 
   return true;
@@ -1458,9 +1455,4 @@ const char* getStateName(int state) {
     case 99: return "LANDING";
     default: return "UNKNOWN";
   }
-}
-
-unsigned long getGPSRecordInterval(int state) {
-  // GPS data arrives at ~1Hz, so record at 1Hz for all states
-  return 1000; // 1Hz (1000ms interval) for all recording states
 }
