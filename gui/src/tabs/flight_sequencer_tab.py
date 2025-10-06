@@ -57,6 +57,18 @@ class FlightSequencerTab:
         self.flight_history = []
         self.last_recorded_phase = None
 
+        # Responsive layout state
+        self.is_mobile_layout = False
+        self.current_paned = None
+        self.left_frame = None
+        self.right_frame = None
+
+        # Button layout state
+        self.is_narrow_layout = False
+        self.narrow_width_threshold = 500  # Width threshold for button stacking
+        self.action_frame = None
+        self.action_buttons = {}
+
         # Create main tab frame
         self.frame = ttk.Frame(parent)
 
@@ -73,42 +85,74 @@ class FlightSequencerTab:
         """Configure custom styles for the tab."""
         try:
             style = ttk.Style()
-            # Create emergency button style with red background
+            # Create emergency button style with high contrast
             style.configure("Emergency.TButton",
-                          background="#ff4444",
-                          foreground="white",
-                          font=('TkDefaultFont', 9, 'bold'))
+                          background="#b71c1c",  # Much darker red for better contrast
+                          foreground="#ffffff",  # Pure white text
+                          font=('TkDefaultFont', 10, 'bold'),  # Slightly larger font
+                          relief="raised",
+                          borderwidth=2,
+                          focuscolor="none")  # Remove focus ring
+
+            # Configure hover and active states for better visibility
+            style.map("Emergency.TButton",
+                     background=[('active', '#d32f2f'),  # Lighter red on hover
+                               ('pressed', '#8b0000')],   # Dark red when pressed
+                     foreground=[('active', '#ffffff'),
+                               ('pressed', '#ffffff')])
         except Exception:
             # If style configuration fails, continue without custom styling
             pass
 
     def _create_widgets(self):
         """Create FlightSequencer interface widgets."""
+        self._create_responsive_layout()
+
+    def _create_responsive_layout(self):
+        """Create layout that can be switched between desktop and mobile modes."""
+        # Clear existing widgets
+        for widget in self.frame.winfo_children():
+            widget.destroy()
+
+        # Determine orientation based on mobile layout state
+        orient = 'vertical' if self.is_mobile_layout else 'horizontal'
+
         # Create paned window for resizable layout
-        paned = ttk.PanedWindow(self.frame, orient='horizontal')
-        paned.pack(fill='both', expand=True, padx=5, pady=5)
-        
-        # Left panel - Controls and parameters
-        left_frame = ttk.Frame(paned)
-        paned.add(left_frame, weight=1)
-        
-        # Right panel - Serial monitor
-        right_frame = ttk.Frame(paned)
-        paned.add(right_frame, weight=2)
-        
-        # Create control panels
-        self._create_flight_controls(left_frame)
-        self._create_flight_data_controls(left_frame)
-        self._create_status_display(left_frame)
-        
-        # Serial monitor
+        self.current_paned = ttk.PanedWindow(self.frame, orient=orient)
+        self.current_paned.pack(fill='both', expand=True, padx=5, pady=5)
+
+        # Create frames
+        self.left_frame = ttk.Frame(self.current_paned)
+        self.right_frame = ttk.Frame(self.current_paned)
+
+        if self.is_mobile_layout:
+            # Mobile: Controls on top, monitor on bottom
+            self.current_paned.add(self.left_frame, weight=1)
+            self.current_paned.add(self.right_frame, weight=1)
+        else:
+            # Desktop: Controls on left, monitor on right
+            self.current_paned.add(self.left_frame, weight=1)
+            self.current_paned.add(self.right_frame, weight=2)
+
+        # Create control panels in left/top frame
+        self._create_flight_controls(self.left_frame)
+        self._create_flight_data_controls(self.left_frame)
+        self._create_status_display(self.left_frame)
+
+        # Serial monitor in right/bottom frame
         self.serial_monitor_widget = SerialMonitorWidget(
-            right_frame, 
+            self.right_frame,
             title="FlightSequencer Serial Monitor",
             show_timestamp=True
         )
         self.serial_monitor_widget.pack(fill='both', expand=True)
         self.serial_monitor_widget.set_send_callback(self._send_command)
+
+        # Bind frame resize events for width-based layout checking
+        if self.left_frame:
+            self.left_frame.bind('<Configure>', self._on_frame_resize)
+            # Schedule initial width check after widgets are rendered
+            self.parent.after(200, self._check_width_layout)
         
     def _create_flight_controls(self, parent):
         """Create flight parameter controls."""
@@ -170,25 +214,31 @@ class FlightSequencerTab:
         dt_dwell_entry.pack(side='left', padx=5)
         ttk.Button(dt_dwell_frame, text="Set", command=self._set_dt_dwell).pack(side='left', padx=2)
 
-        # Action buttons
-        action_frame = ttk.Frame(param_frame)
-        action_frame.pack(fill='x', padx=5, pady=5)
-
-        ttk.Button(action_frame, text="Get Parameters",
-                  command=self._get_parameters).pack(side='left', padx=2)
-        ttk.Button(action_frame, text="Reset Defaults",
-                  command=self._reset_parameters).pack(side='left', padx=2)
-
-        # Emergency Stop button - prominent red button
-        ttk.Button(action_frame, text="Emergency Stop",
+        # Emergency Stop button - directly below DT Dwell Time
+        emergency_frame = ttk.Frame(param_frame)
+        emergency_frame.pack(fill='x', padx=5, pady=5)
+        ttk.Button(emergency_frame, text="Emergency Stop",
                   command=self._emergency_stop,
-                  style="Emergency.TButton").pack(side='left', padx=10)
+                  style="Emergency.TButton").pack()
 
-        # Parameter file management buttons
-        ttk.Button(action_frame, text="Save Parameters",
-                  command=self._save_parameters_to_file).pack(side='right', padx=2)
-        ttk.Button(action_frame, text="Load Parameters",
-                  command=self._load_parameters_from_file).pack(side='right', padx=2)
+        # Action buttons frame (responsive)
+        self.action_frame = ttk.Frame(param_frame)
+        self.action_frame.pack(fill='x', padx=5, pady=5)
+
+        # Store button references for responsive layout
+        self.action_buttons = {
+            'get_params': ttk.Button(self.action_frame, text="Get Parameters",
+                                   command=self._get_parameters),
+            'reset_params': ttk.Button(self.action_frame, text="Reset Defaults",
+                                     command=self._reset_parameters),
+            'save_params': ttk.Button(self.action_frame, text="Save Parameters",
+                                    command=self._save_parameters_to_file),
+            'load_params': ttk.Button(self.action_frame, text="Load Parameters",
+                                    command=self._load_parameters_from_file)
+        }
+
+        # Initial button layout (will be updated by responsive system)
+        self._layout_action_buttons()
 
     def _create_flight_data_controls(self, parent):
         """Create flight data download and management controls."""
@@ -1389,6 +1439,65 @@ class FlightSequencerTab:
             self.history_text.config(state='disabled')
 
         self.parent.after(0, clear_history)
+
+    def _layout_action_buttons(self):
+        """Layout action buttons based on available width."""
+        # Clear existing button layout
+        for button in self.action_buttons.values():
+            button.pack_forget()
+
+        if self.is_narrow_layout:
+            # Narrow layout: Stack buttons vertically
+            button_order = ['get_params', 'reset_params', 'save_params', 'load_params']
+            for button_key in button_order:
+                if button_key in self.action_buttons:
+                    self.action_buttons[button_key].pack(fill='x', padx=2, pady=1)
+        else:
+            # Wide layout: Horizontal arrangement
+            self.action_buttons['get_params'].pack(side='left', padx=2)
+            self.action_buttons['reset_params'].pack(side='left', padx=2)
+            self.action_buttons['save_params'].pack(side='right', padx=2)
+            self.action_buttons['load_params'].pack(side='right', padx=2)
+
+    def _check_width_layout(self):
+        """Check if button layout should change based on width."""
+        if not self.left_frame:
+            return
+
+        # Get the width of the control panel
+        try:
+            width = self.left_frame.winfo_width()
+            if width <= 1:  # Not yet rendered
+                return
+
+            should_be_narrow = width < self.narrow_width_threshold
+
+            if should_be_narrow != self.is_narrow_layout:
+                self.is_narrow_layout = should_be_narrow
+                print(f"[FlightSequencer] Width layout change: {width}px -> {'narrow' if should_be_narrow else 'wide'}")
+                self._layout_action_buttons()
+        except Exception as e:
+            print(f"[FlightSequencer] Width check error: {e}")
+            pass  # Ignore errors during widget creation/destruction
+
+    def _on_frame_resize(self, event):
+        """Handle frame resize events."""
+        # Only respond to the left frame (control panel) resize events
+        if event.widget == self.left_frame:
+            # Use a small delay to avoid excessive updates during resize
+            if hasattr(self, '_resize_after_id'):
+                self.parent.after_cancel(self._resize_after_id)
+            self._resize_after_id = self.parent.after(150, self._check_width_layout)
+
+    def update_responsive_layout(self, is_mobile):
+        """Update layout based on mobile/desktop mode."""
+        if self.is_mobile_layout != is_mobile:
+            self.is_mobile_layout = is_mobile
+            self._create_responsive_layout()
+
+        # Schedule width check after layout is updated
+        if hasattr(self, 'parent'):
+            self.parent.after(50, self._check_width_layout)
 
     def get_frame(self):
         """Get the main tab frame."""

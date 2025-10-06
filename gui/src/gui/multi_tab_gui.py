@@ -34,7 +34,7 @@ class FlightCodeManager:
         self.root = tk.Tk()
         self.root.title("Flight Code Manager v2.0")
         self.root.geometry("1200x800")
-        self.root.minsize(800, 600)
+        self.root.minsize(400, 300)  # Allow smaller minimum size for mobile
 
         # Set window icon (will be set after GUI creation for better compatibility)
         self.icon_path = None
@@ -60,7 +60,11 @@ class FlightCodeManager:
         # Application state
         self.current_app = ApplicationType.UNKNOWN
         self.tabs = {}
-        
+
+        # Responsive layout state
+        self.is_mobile_layout = False
+        self.mobile_threshold_ratio = 1.2  # height/width ratio threshold for mobile layout
+
         # Create GUI
         self._create_widgets()
         self._setup_callbacks()
@@ -70,6 +74,9 @@ class FlightCodeManager:
 
         # Start periodic updates
         self._start_periodic_updates()
+
+        # Check initial layout after a brief delay to let window settle
+        self.root.after(100, self._check_initial_layout)
         
     def _create_widgets(self):
         """Create main GUI widgets."""
@@ -216,7 +223,10 @@ class FlightCodeManager:
         
         # Window close callback
         self.root.protocol("WM_DELETE_WINDOW", self._on_window_close)
-        
+
+        # Window resize callback for responsive layout
+        self.root.bind('<Configure>', self._on_window_resize)
+
         # Message counter
         self.message_count = 0
         
@@ -359,7 +369,58 @@ class FlightCodeManager:
         """Clear flight status from the status bar."""
         self.flight_phase_var.set("")
         self.flight_timer_var.set("")
-        
+
+    def _on_window_resize(self, event):
+        """Handle window resize events for responsive layout."""
+        # Only respond to main window resize events
+        if event.widget != self.root:
+            return
+
+        # Get current window dimensions
+        width = self.root.winfo_width()
+        height = self.root.winfo_height()
+
+        # Skip if dimensions are not valid (during initialization)
+        if width <= 1 or height <= 1:
+            return
+
+        # Calculate aspect ratio (height/width)
+        aspect_ratio = height / width
+
+        # Determine if we should use mobile layout
+        should_be_mobile = aspect_ratio > self.mobile_threshold_ratio
+
+        # Only update layout if state changed
+        if should_be_mobile != self.is_mobile_layout:
+            self.is_mobile_layout = should_be_mobile
+            self._update_responsive_layout()
+
+        # Always check width-based layouts (for button stacking)
+        # Use a small delay to let the window settle
+        self.root.after(100, self._check_width_layouts)
+
+    def _check_initial_layout(self):
+        """Check initial layout and trigger responsive update if needed."""
+        # Force a layout check
+        event = type('MockEvent', (), {'widget': self.root})()
+        self._on_window_resize(event)
+
+    def _update_responsive_layout(self):
+        """Update layout based on mobile/desktop state."""
+        # Notify all tabs about layout change
+        for app_type, tab_info in self.tabs.items():
+            tab = tab_info['tab']
+            if hasattr(tab, 'update_responsive_layout'):
+                tab.update_responsive_layout(self.is_mobile_layout)
+
+    def _check_width_layouts(self):
+        """Check width-based layouts for all tabs."""
+        # Notify all tabs to check their width-based layouts
+        for app_type, tab_info in self.tabs.items():
+            tab = tab_info['tab']
+            if hasattr(tab, '_check_width_layout'):
+                tab._check_width_layout()
+
     def _on_window_close(self):
         """Handle window close event."""
         try:

@@ -53,7 +53,13 @@ class GpsAutopilotTab:
             'center': 1500, 'range': 400, 'direction': 'Normal',
             'updated': False
         }
-        
+
+        # Responsive layout state
+        self.is_mobile_layout = False
+        self.main_paned = None
+        self.left_frame = None
+        self.right_frame = None
+
         # Create main tab frame
         self.frame = ttk.Frame(parent)
         self._create_widgets()
@@ -64,26 +70,42 @@ class GpsAutopilotTab:
         
     def _create_widgets(self):
         """Create GpsAutopilot interface widgets."""
+        self._create_responsive_layout()
+
+    def _create_responsive_layout(self):
+        """Create layout that can be switched between desktop and mobile modes."""
+        # Clear existing widgets
+        for widget in self.frame.winfo_children():
+            widget.destroy()
+
+        # Determine orientation based on mobile layout state
+        orient = 'vertical' if self.is_mobile_layout else 'horizontal'
+
         # Create paned window for layout
-        main_paned = ttk.PanedWindow(self.frame, orient='horizontal')
-        main_paned.pack(fill='both', expand=True, padx=5, pady=5)
-        
-        # Left panel - Controls and status
-        left_frame = ttk.Frame(main_paned)
-        main_paned.add(left_frame, weight=1)
-        
-        # Right panel - Serial monitor
-        right_frame = ttk.Frame(main_paned)
-        main_paned.add(right_frame, weight=1)
-        
+        self.main_paned = ttk.PanedWindow(self.frame, orient=orient)
+        self.main_paned.pack(fill='both', expand=True, padx=5, pady=5)
+
+        # Create frames
+        self.left_frame = ttk.Frame(self.main_paned)
+        self.right_frame = ttk.Frame(self.main_paned)
+
+        if self.is_mobile_layout:
+            # Mobile: Controls on top, monitor on bottom
+            self.main_paned.add(self.left_frame, weight=1)
+            self.main_paned.add(self.right_frame, weight=1)
+        else:
+            # Desktop: Controls on left, monitor on right
+            self.main_paned.add(self.left_frame, weight=1)
+            self.main_paned.add(self.right_frame, weight=1)
+
         # Create control sections
-        self._create_navigation_controls(left_frame)
-        self._create_control_parameters(left_frame)
-        self._create_flight_status(left_frame)
-        
+        self._create_navigation_controls(self.left_frame)
+        self._create_control_parameters(self.left_frame)
+        self._create_flight_status(self.left_frame)
+
         # Serial monitor
         self.serial_monitor_widget = SerialMonitorWidget(
-            right_frame,
+            self.right_frame,
             title="GpsAutopilot Serial Monitor",
             show_timestamp=True
         )
@@ -655,6 +677,12 @@ class GpsAutopilotTab:
         config_text = f"Config: Center={center}us Range={range_val}us Dir={direction}"
         self.servo_config_var.set(config_text)
         
+    def update_responsive_layout(self, is_mobile):
+        """Update layout based on mobile/desktop mode."""
+        if self.is_mobile_layout != is_mobile:
+            self.is_mobile_layout = is_mobile
+            self._create_responsive_layout()
+
     def get_frame(self):
         """Get the main tab frame."""
         return self.frame
