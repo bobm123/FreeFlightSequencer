@@ -18,7 +18,7 @@ from gui.multi_tab_gui import main as gui_main
 
 def main():
     """Main application entry point."""
-    print("Starting Arduino Control Center...")
+    print("Starting Flight Code Manager...")
     gui_main()
 
 

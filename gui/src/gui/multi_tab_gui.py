@@ -1,5 +1,5 @@
 """
-Multi-Tab GUI - Main interface for Arduino Control Center.
+Multi-Tab GUI - Main interface for Flight Code Manager.
 Unified interface supporting FlightSequencer, GpsAutopilot, and Device Testing.
 """
 import tkinter as tk
@@ -21,8 +21,8 @@ from widgets import ConnectionPanel
 from tabs import FlightSequencerTab, GpsAutopilotTab, DeviceTestTab
 
 
-class ArduinoControlCenter:
-    """Main multi-tab GUI application for Arduino control."""
+class FlightCodeManager:
+    """Main multi-tab GUI application for flight code management."""
     
     def __init__(self):
         # Core components
@@ -32,7 +32,7 @@ class ArduinoControlCenter:
         
         # Create main window
         self.root = tk.Tk()
-        self.root.title("Arduino Control Center v2.0")
+        self.root.title("Flight Code Manager v2.0")
         self.root.geometry("1200x800")
         self.root.minsize(800, 600)
 
@@ -95,11 +95,11 @@ class ArduinoControlCenter:
         title_frame = ttk.Frame(header_frame)
         title_frame.pack(side='left')
         
-        title_label = ttk.Label(title_frame, text="Arduino Control Center", 
+        title_label = ttk.Label(title_frame, text="Flight Code Manager",
                                font=('TkDefaultFont', 12, 'bold'))
         title_label.pack(anchor='w')
-        
-        version_label = ttk.Label(title_frame, text="Multi-Application Interface v2.0",
+
+        version_label = ttk.Label(title_frame, text="Flight Control Software Interface v2.0",
                                  font=('TkDefaultFont', 8))
         version_label.pack(anchor='w')
         
@@ -140,7 +140,7 @@ class ArduinoControlCenter:
         tab_frame = ttk.Frame(self.notebook)
         self.notebook.add(tab_frame, text="FlightSequencer")
         
-        self.flight_sequencer_tab = FlightSequencerTab(tab_frame, self.serial_monitor, self.tab_manager)
+        self.flight_sequencer_tab = FlightSequencerTab(tab_frame, self.serial_monitor, self.tab_manager, self)
         self.flight_sequencer_tab.get_frame().pack(fill='both', expand=True)
         
         self.tabs[ApplicationType.FLIGHT_SEQUENCER] = {
@@ -182,15 +182,26 @@ class ArduinoControlCenter:
         # Connection status
         self.connection_status_var = tk.StringVar(value="Disconnected")
         ttk.Label(status_frame, textvariable=self.connection_status_var).pack(side='left')
-        
+
         # Message count
         self.message_count_var = tk.StringVar(value="Messages: 0")
         ttk.Label(status_frame, textvariable=self.message_count_var).pack(side='left', padx=10)
-        
+
+        # Flight phase status (for FlightSequencer)
+        self.flight_phase_var = tk.StringVar(value="")
+        self.flight_phase_label = ttk.Label(status_frame, textvariable=self.flight_phase_var)
+        self.flight_phase_label.pack(side='left', padx=10)
+
+        # Flight timer (for FlightSequencer)
+        self.flight_timer_var = tk.StringVar(value="")
+        self.flight_timer_label = ttk.Label(status_frame, textvariable=self.flight_timer_var,
+                                           font=('TkDefaultFont', 9, 'bold'))
+        self.flight_timer_label.pack(side='left', padx=5)
+
         # Current time
         self.time_var = tk.StringVar()
         ttk.Label(status_frame, textvariable=self.time_var).pack(side='right')
-        
+
         # Tab indicator
         self.current_tab_var = tk.StringVar(value="Current: FlightSequencer")
         ttk.Label(status_frame, textvariable=self.current_tab_var).pack(side='right', padx=10)
@@ -300,17 +311,28 @@ class ArduinoControlCenter:
         """Handle tab selection changes."""
         selected_tab = self.notebook.index('current')
         tab_names = ["FlightSequencer", "GpsAutopilot", "Device Testing"]
-        
+
         if 0 <= selected_tab < len(tab_names):
             self.current_tab_var.set(f"Current: {tab_names[selected_tab]}")
-            
+
+            # Show/hide flight status based on selected tab
+            if tab_names[selected_tab] == "FlightSequencer":
+                # Update flight status if FlightSequencer tab has data
+                if hasattr(self, 'flight_sequencer_tab') and self.flight_sequencer_tab:
+                    params = self.flight_sequencer_tab.current_flight_params
+                    timer = self.flight_sequencer_tab.current_timer
+                    self.update_flight_status(params['current_phase'], timer)
+            else:
+                # Clear flight status for other tabs
+                self.clear_flight_status()
+
         # If we have a known app type but user switched to different tab,
         # allow manual override
         if self.current_app != ApplicationType.UNKNOWN:
             for app_type, tab_info in self.tabs.items():
                 if tab_info['index'] == selected_tab and app_type != self.current_app:
                     # User manually selected different tab
-                    if messagebox.askyesno("Override Detection", 
+                    if messagebox.askyesno("Override Detection",
                                          f"Detected {self.current_app.value} but selected {app_type.value} tab.\\n"
                                          f"Override automatic detection?"):
                         self.tab_manager.force_application_type(app_type)
@@ -322,9 +344,21 @@ class ArduinoControlCenter:
         # Update message counter
         self.message_count += 1
         self.message_count_var.set(f"Messages: {self.message_count}")
-        
+
         # Route data through tab manager
         self.tab_manager.route_message(data)
+
+    def update_flight_status(self, phase=None, timer=None):
+        """Update flight status in the status bar."""
+        if phase is not None:
+            self.flight_phase_var.set(f"Phase: {phase}")
+        if timer is not None:
+            self.flight_timer_var.set(f"Time: {timer}")
+
+    def clear_flight_status(self):
+        """Clear flight status from the status bar."""
+        self.flight_phase_var.set("")
+        self.flight_timer_var.set("")
         
     def _on_window_close(self):
         """Handle window close event."""
@@ -362,7 +396,7 @@ class ArduinoControlCenter:
 def main():
     """Main entry point for multi-tab GUI."""
     try:
-        app = ArduinoControlCenter()
+        app = FlightCodeManager()
         app.run()
     except Exception as e:
         print(f"Application error: {e}")

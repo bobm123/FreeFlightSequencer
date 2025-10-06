@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Arduino Control Center - Startup Script
+Flight Code Manager - Startup Script
 Simplified launcher that handles path setup automatically.
 """
 import sys
@@ -16,7 +16,7 @@ def main():
     if src_path not in sys.path:
         sys.path.insert(0, src_path)
     
-    print("Starting Arduino Control Center v2.0...")
+    print("Starting Flight Code Manager v2.0...")
     print("Multi-Tab Interface: FlightSequencer | GpsAutopilot | Device Testing")
     print("=" * 60)
     
@@ -35,8 +35,8 @@ def main():
         
         print()
         
-        from gui.multi_tab_gui import ArduinoControlCenter
-        app = ArduinoControlCenter()
+        from gui.multi_tab_gui import FlightCodeManager
+        app = FlightCodeManager()
         app.run()
         
     except ImportError as e:

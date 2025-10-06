@@ -25,10 +25,11 @@ from core.parameter_monitor import ParameterMonitor
 class FlightSequencerTab:
     """Enhanced FlightSequencer tab with profiles and monitoring."""
     
-    def __init__(self, parent, serial_monitor, tab_manager):
+    def __init__(self, parent, serial_monitor, tab_manager, main_gui=None):
         self.parent = parent
         self.serial_monitor = serial_monitor
         self.tab_manager = tab_manager
+        self.main_gui = main_gui
         self.param_monitor = ParameterMonitor()
 
         # Flight data management
@@ -47,6 +48,14 @@ class FlightSequencerTab:
             'dt_deployed': None,
             'dt_dwell': None
         }
+
+        # Flight timing
+        self.flight_start_time = None
+        self.current_timer = "00:00"
+
+        # Flight history tracking
+        self.flight_history = []
+        self.last_recorded_phase = None
 
         # Create main tab frame
         self.frame = ttk.Frame(parent)
@@ -170,6 +179,11 @@ class FlightSequencerTab:
         ttk.Button(action_frame, text="Reset Defaults",
                   command=self._reset_parameters).pack(side='left', padx=2)
 
+        # Emergency Stop button - prominent red button
+        ttk.Button(action_frame, text="Emergency Stop",
+                  command=self._emergency_stop,
+                  style="Emergency.TButton").pack(side='left', padx=10)
+
         # Parameter file management buttons
         ttk.Button(action_frame, text="Save Parameters",
                   command=self._save_parameters_to_file).pack(side='right', padx=2)
@@ -203,34 +217,31 @@ class FlightSequencerTab:
                   command=self._view_flight_path).pack(side='right', padx=2)
 
     def _create_status_display(self, parent):
-        """Create flight status display."""
-        status_frame = ttk.LabelFrame(parent, text="Flight Status")
-        status_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        """Create flight history display."""
+        history_frame = ttk.LabelFrame(parent, text="Flight History")
+        history_frame.pack(fill='both', expand=True, padx=5, pady=5)
 
-        # Flight phase - larger, more prominent
-        phase_frame = ttk.Frame(status_frame)
-        phase_frame.pack(fill='x', padx=5, pady=10)
+        # Create scrollable text widget for flight history
+        history_container = ttk.Frame(history_frame)
+        history_container.pack(fill='both', expand=True, padx=5, pady=5)
 
-        self.current_phase_var = tk.StringVar(value="Phase: UNKNOWN")
-        phase_label = ttk.Label(phase_frame, textvariable=self.current_phase_var,
-                               font=('TkDefaultFont', 12, 'bold'))
-        phase_label.pack()
+        # Text widget with scrollbar
+        self.history_text = tk.Text(history_container, height=8, wrap='word',
+                                   font=('Consolas', 9), state='disabled')
 
-        # Timer display - prominent for flight timing
-        self.timer_var = tk.StringVar(value="Time: --:--")
-        timer_label = ttk.Label(status_frame, textvariable=self.timer_var,
-                              font=('TkDefaultFont', 14, 'bold'))
-        timer_label.pack(pady=10)
+        history_scrollbar = ttk.Scrollbar(history_container, orient='vertical',
+                                         command=self.history_text.yview)
+        self.history_text.configure(yscrollcommand=history_scrollbar.set)
 
-        # Emergency stop button in flight status box
-        emergency_frame = ttk.Frame(status_frame)
-        emergency_frame.pack(fill='x', padx=5, pady=10)
+        self.history_text.pack(side='left', fill='both', expand=True)
+        history_scrollbar.pack(side='right', fill='y')
 
-        ttk.Button(emergency_frame, text="Emergency Stop",
-                  command=self._emergency_stop,
-                  style="Emergency.TButton").pack()
+        # Clear history button
+        clear_frame = ttk.Frame(history_frame)
+        clear_frame.pack(fill='x', padx=5, pady=5)
 
-        # Flight statistics - removed misleading flight count
+        ttk.Button(clear_frame, text="Clear History",
+                  command=self._clear_flight_history).pack(side='right')
             
     def _send_command(self, command):
         """Send command to FlightSequencer."""
@@ -334,6 +345,7 @@ class FlightSequencerTab:
                               "Send emergency stop command?"):
             self._send_command("STOP")
             self.serial_monitor_widget.log_error("EMERGENCY STOP SENT")
+            self._add_history_entry("EMERGENCY", "Emergency stop command sent")
             
     def handle_serial_data(self, data):
         """Handle incoming serial data for FlightSequencer."""
@@ -349,13 +361,42 @@ class FlightSequencerTab:
         # Handle flight data download
         self._handle_flight_data_response(data)
 
+        # Track other significant events
+        self._track_flight_events(data)
+
+    def _track_flight_events(self, data):
+        """Track significant flight events for history."""
+        # Flight data events
+        if "flight records downloaded" in data.lower():
+            self._add_history_entry("DATA", "Flight data downloaded successfully")
+        elif "flight records cleared" in data.lower():
+            self._add_history_entry("DATA", "Flight records cleared")
+
+        # Error events
+        if re.search(r'\[ERROR\]', data, re.IGNORECASE):
+            error_msg = data.strip()
+            if len(error_msg) > 100:
+                error_msg = error_msg[:97] + "..."
+            self._add_history_entry("ERROR", error_msg.replace("[ERROR]", "").strip())
+
+        # Warning events
+        if re.search(r'\[WARN\]', data, re.IGNORECASE):
+            warning_msg = data.strip()
+            if len(warning_msg) > 100:
+                warning_msg = warning_msg[:97] + "..."
+            self._add_history_entry("WARNING", warning_msg.replace("[WARN]", "").strip())
+
 
     def handle_connection_change(self, connected):
         """Handle connection status changes."""
         if not connected:
+            # Add disconnection event to history
+            self._add_history_entry("CONNECTION", "Disconnected from Arduino")
             # Clear parameter store when disconnected
             self._clear_parameters()
         else:
+            # Add connection event to history
+            self._add_history_entry("CONNECTION", "Connected to Arduino")
             # On connection, automatically get current parameters and status
             self.parent.after(2500, self._get_parameters)  # Send G command after Arduino settles
 
@@ -382,29 +423,45 @@ class FlightSequencerTab:
             self.dt_deployed_var.set("")
             self.dt_dwell_var.set("")
 
-            # Clear status fields
-            self.current_phase_var.set("Phase: DISCONNECTED")
-            self.timer_var.set("Time: --:--")
+            # Reset timer
+            self.current_timer = "00:00"
+
+            # Clear main GUI status bar
+            if self.main_gui:
+                self.main_gui.clear_flight_status()
 
         self.parent.after(0, clear_params)
 
 
     def _update_parameter_store(self, data):
         """Update canonical parameter store from any Arduino response."""
+        # Track parameter changes with history entries
         # Motor Run Time patterns: "[INFO] Motor Run Time: 20 seconds" or "[OK] Motor Run Time = 12 seconds"
         motor_time_match = re.search(r'Motor Run Time[:\s=]+(\d+)', data, re.IGNORECASE)
         if motor_time_match:
-            self.current_flight_params['motor_run_time'] = int(motor_time_match.group(1))
+            new_value = int(motor_time_match.group(1))
+            if self.current_flight_params['motor_run_time'] != new_value:
+                if re.search(r'\[OK\]', data):  # Only log when set, not when read
+                    self._add_history_entry("PARAM", f"Motor run time set to {new_value} seconds")
+                self.current_flight_params['motor_run_time'] = new_value
 
         # Total Flight Time patterns: "[INFO] Total Flight Time: 120 seconds"
         flight_time_match = re.search(r'Total Flight Time[:\s=]+(\d+)', data, re.IGNORECASE)
         if flight_time_match:
-            self.current_flight_params['total_flight_time'] = int(flight_time_match.group(1))
+            new_value = int(flight_time_match.group(1))
+            if self.current_flight_params['total_flight_time'] != new_value:
+                if re.search(r'\[OK\]', data):  # Only log when set, not when read
+                    self._add_history_entry("PARAM", f"Total flight time set to {new_value} seconds")
+                self.current_flight_params['total_flight_time'] = new_value
 
         # Motor Speed patterns: "[INFO] Motor Speed: 150 (1500us PWM)" or "[OK] Motor Speed = 135"
         motor_speed_match = re.search(r'Motor Speed[:\s=]+(\d+)', data, re.IGNORECASE)
         if motor_speed_match:
-            self.current_flight_params['motor_speed'] = int(motor_speed_match.group(1))
+            new_value = int(motor_speed_match.group(1))
+            if self.current_flight_params['motor_speed'] != new_value:
+                if re.search(r'\[OK\]', data):  # Only log when set, not when read
+                    self._add_history_entry("PARAM", f"Motor speed set to {new_value}")
+                self.current_flight_params['motor_speed'] = new_value
 
         # DT Retracted patterns: "[INFO] DT Retracted: 1000us" or "[OK] DT Retracted = 1000"
         dt_retracted_match = re.search(r'DT Retracted[:\s=]+(\d+)', data, re.IGNORECASE)
@@ -423,37 +480,82 @@ class FlightSequencerTab:
 
         # Current Phase patterns: "[INFO] Current Phase: READY" or state transition messages
         phase_match = re.search(r'Current Phase:\s*([A-Z_]+)', data, re.IGNORECASE)
+        new_phase = None
+
         if phase_match:
-            self.current_flight_params['current_phase'] = phase_match.group(1).upper()
+            new_phase = phase_match.group(1).upper()
         else:
             # State transition messages
             if re.search(r'System ready|ready for new flight', data, re.IGNORECASE):
-                self.current_flight_params['current_phase'] = 'READY'
+                new_phase = 'READY'
             elif re.search(r'System ARMED', data, re.IGNORECASE):
-                self.current_flight_params['current_phase'] = 'ARMED'
+                new_phase = 'ARMED'
             elif re.search(r'LAUNCH.*Motor|Motor spooling', data, re.IGNORECASE):
-                self.current_flight_params['current_phase'] = 'MOTOR_SPOOL'
+                new_phase = 'MOTOR_SPOOL'
             elif re.search(r'Motor at flight speed', data, re.IGNORECASE):
-                self.current_flight_params['current_phase'] = 'MOTOR_RUN'
+                new_phase = 'MOTOR_RUN'
             elif re.search(r'Motor.*complete.*glide', data, re.IGNORECASE):
-                self.current_flight_params['current_phase'] = 'GLIDE'
+                new_phase = 'GLIDE'
             elif re.search(r'deploying DT|Flight time complete', data, re.IGNORECASE):
-                self.current_flight_params['current_phase'] = 'DT_DEPLOY'
+                new_phase = 'DT_DEPLOY'
             elif re.search(r'Dethermalizer DEPLOYED', data, re.IGNORECASE):
-                self.current_flight_params['current_phase'] = 'DT_DEPLOYED'
+                new_phase = 'DT_DEPLOYED'
             elif re.search(r'flight complete', data, re.IGNORECASE):
-                self.current_flight_params['current_phase'] = 'LANDING'
+                new_phase = 'LANDING'
+
+        # Track phase changes and add to history
+        if new_phase and new_phase != self.last_recorded_phase:
+            self.current_flight_params['current_phase'] = new_phase
+            self.last_recorded_phase = new_phase
+
+            # Add history entry for phase change
+            phase_descriptions = {
+                'READY': 'System ready for new flight',
+                'ARMED': 'System armed, ready for launch',
+                'MOTOR_SPOOL': 'Motor spooling up for launch',
+                'MOTOR_RUN': 'Motor running at flight speed',
+                'GLIDE': 'Motor complete, entering glide phase',
+                'DT_DEPLOY': 'Deploying dethermalizer',
+                'DT_DEPLOYED': 'Dethermalizer deployed',
+                'LANDING': 'Flight complete, landing phase'
+            }
+
+            description = phase_descriptions.get(new_phase, f"Phase changed to {new_phase}")
+            self._add_history_entry("PHASE", description)
 
         # GPS State patterns: "[INFO] GPS Status: Available" or "GPS Status: Not detected"
         gps_status_match = re.search(r'GPS Status:\s*([^()\n]+)', data, re.IGNORECASE)
         if gps_status_match:
             gps_status = gps_status_match.group(1).strip()
+            new_gps_state = None
+
             if 'available' in gps_status.lower():
-                self.current_flight_params['gps_state'] = 'AVAILABLE'
+                new_gps_state = 'AVAILABLE'
             elif 'not detected' in gps_status.lower():
-                self.current_flight_params['gps_state'] = 'NOT_DETECTED'
+                new_gps_state = 'NOT_DETECTED'
             else:
-                self.current_flight_params['gps_state'] = gps_status.upper()
+                new_gps_state = gps_status.upper()
+
+            # Track GPS state changes
+            if new_gps_state != self.current_flight_params['gps_state']:
+                gps_descriptions = {
+                    'AVAILABLE': 'GPS module detected and available',
+                    'NOT_DETECTED': 'GPS module not detected'
+                }
+                description = gps_descriptions.get(new_gps_state, f"GPS status: {new_gps_state}")
+                self._add_history_entry("GPS", description)
+                self.current_flight_params['gps_state'] = new_gps_state
+
+        # Flight timing patterns: "Flight time: 45s" or "Elapsed: 01:23"
+        time_match = re.search(r'(?:Flight time|Elapsed):\s*(?:(\d+)s|(\d+):(\d+))', data, re.IGNORECASE)
+        if time_match:
+            if time_match.group(1):  # Format: "45s"
+                seconds = int(time_match.group(1))
+                minutes = seconds // 60
+                seconds = seconds % 60
+                self.current_timer = f"{minutes:02d}:{seconds:02d}"
+            elif time_match.group(2) and time_match.group(3):  # Format: "01:23"
+                self.current_timer = f"{time_match.group(2)}:{time_match.group(3)}"
 
     def _sync_gui_with_parameters(self):
         """Update GUI fields to match canonical parameter store."""
@@ -479,8 +581,12 @@ class FlightSequencerTab:
             if params['dt_dwell'] is not None:
                 self.dt_dwell_var.set(str(params['dt_dwell']))
 
-            # Update phase display
-            self.current_phase_var.set(f"Phase: {params['current_phase']}")
+            # Update main GUI status bar with phase and timer information
+            if self.main_gui:
+                self.main_gui.update_flight_status(
+                    phase=params['current_phase'],
+                    timer=self.current_timer
+                )
 
             # Update GPS status display
             self.gps_status_var.set(f"GPS: {params['gps_state']}")
@@ -1252,6 +1358,37 @@ class FlightSequencerTab:
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load parameters:\n{str(e)}")
+
+    def _add_history_entry(self, event_type, description):
+        """Add an entry to the flight history."""
+        from datetime import datetime
+
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        entry = f"[{timestamp}] {event_type}: {description}"
+
+        # Store in history list
+        self.flight_history.append(entry)
+
+        # Update the text widget
+        def update_history():
+            self.history_text.config(state='normal')
+            self.history_text.insert('end', entry + '\n')
+            self.history_text.config(state='disabled')
+            self.history_text.see('end')  # Auto-scroll to bottom
+
+        self.parent.after(0, update_history)
+
+    def _clear_flight_history(self):
+        """Clear the flight history display."""
+        self.flight_history.clear()
+        self.last_recorded_phase = None
+
+        def clear_history():
+            self.history_text.config(state='normal')
+            self.history_text.delete('1.0', 'end')
+            self.history_text.config(state='disabled')
+
+        self.parent.after(0, clear_history)
 
     def get_frame(self):
         """Get the main tab frame."""

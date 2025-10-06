@@ -1,6 +1,6 @@
-# Arduino Control Center v2.0
+# Flight Code Manager v2.0
 
-Multi-tab GUI interface for Arduino flight control applications.
+Multi-tab GUI interface for flight control software applications.
 
 ## Quick Start
 
