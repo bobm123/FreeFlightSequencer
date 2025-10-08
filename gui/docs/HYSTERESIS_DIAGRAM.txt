@@ -1,0 +1,222 @@
+Hysteresis Behavior - Serial Monitor Width Thresholds
+======================================================
+
+CONCEPT: Dual Threshold Prevents Oscillation
+---------------------------------------------
+
+         │
+  Wide   │     Side-by-side mode
+  Window │           ▲
+         │           │
+  500px ─┼───────────┤
+         │           │ Unstack only when width >= 400px
+  400px ═╪═══════════╧════════════════════════════════════
+         ║
+         ║           HYSTERESIS ZONE
+         ║           (80px dead zone)
+         ║           No state changes in this region!
+         ║
+  320px ═╪═══════════╤════════════════════════════════════
+         │           │ Stack only when width < 320px
+         │           │
+  200px ─┼───────────┤
+         │           ▼
+  Narrow │     Stacked mode
+  Window │
+         │
+
+
+RESIZE BEHAVIOR: Narrowing Window (500px → 200px)
+--------------------------------------------------
+
+Step 1: Starting wide (side-by-side)
+┌─────────────────────────────────────────────────┐
+│ Width: 500px                                    │
+│ State: SIDE-BY-SIDE                             │
+│ Action: None (above both thresholds)            │
+└─────────────────────────────────────────────────┘
+
+Step 2: Entering dead zone
+┌─────────────────────────────────────────────────┐
+│ Width: 380px                                    │
+│ State: SIDE-BY-SIDE (unchanged)                 │
+│ Action: None (in dead zone, stay side-by-side)  │
+└─────────────────────────────────────────────────┘
+
+Step 3: Crossing LOW threshold
+┌─────────────────────────────────────────────────┐
+│ Width: 310px < 320px  ← TRIGGER!                │
+│ State: SIDE-BY-SIDE → STACKED                   │
+│ Action: Layout stacks vertically                │
+│ Console: "310px < 320px -> stacking"            │
+└─────────────────────────────────────────────────┘
+
+Step 4: Now stacked with full width
+┌─────────────────────────────────────────────────┐
+│ Width: 850px (full window width)                │
+│ State: STACKED (unchanged)                      │
+│ Action: None (need >= 400px to unstack)         │
+│ Console: (no message, stable state)             │
+└─────────────────────────────────────────────────┘
+
+
+RESIZE BEHAVIOR: Widening Window (200px → 500px)
+-------------------------------------------------
+
+Step 1: Starting narrow (stacked)
+┌─────────────────────────────────────────────────┐
+│ Width: 250px                                    │
+│ State: STACKED                                  │
+│ Action: None (below LOW threshold)              │
+└─────────────────────────────────────────────────┘
+
+Step 2: Entering dead zone from below
+┌─────────────────────────────────────────────────┐
+│ Width: 350px                                    │
+│ State: STACKED (unchanged)                      │
+│ Action: None (in dead zone, stay stacked)       │
+└─────────────────────────────────────────────────┘
+
+Step 3: Crossing HIGH threshold
+┌─────────────────────────────────────────────────┐
+│ Width: 420px >= 400px  ← TRIGGER!               │
+│ State: STACKED → SIDE-BY-SIDE                   │
+│ Action: Layout switches to horizontal           │
+│ Console: "420px >= 400px -> side-by-side"       │
+└─────────────────────────────────────────────────┘
+
+Step 4: Now side-by-side with narrower panel
+┌─────────────────────────────────────────────────┐
+│ Width: 280px (1/3 of window)                    │
+│ State: SIDE-BY-SIDE (unchanged)                 │
+│ Action: None (need < 320px to stack)            │
+│ Console: (no message, stable state)             │
+└─────────────────────────────────────────────────┘
+
+
+STATE DIAGRAM WITH HYSTERESIS
+------------------------------
+
+              width >= 400px
+         ┌─────────────────────┐
+         │                     │
+         ▼                     │
+    ╔═══════════════╗          │
+    ║ SIDE-BY-SIDE  ║──────────┘
+    ╚═══════════════╝
+         │         ▲
+         │         │
+width    │         │ width >= 400px
+< 320px  │         │ required!
+         │         │
+         ▼         │
+    ╔═══════════════╗
+    ║   STACKED     ║
+    ╚═══════════════╝
+         │         ▲
+         │         │
+         └─────────┘
+        width < 320px
+
+
+WHY THIS PREVENTS OSCILLATION
+------------------------------
+
+WITHOUT HYSTERESIS (Single threshold at 320px):
+  310px → stack → 850px → unstack → 310px → stack → ...
+  OSCILLATES FOREVER! ❌
+
+WITH HYSTERESIS (Dual threshold 320/400px):
+  310px → stack → 850px → stays stacked (need 400px) ✓
+  Must reach 400px to unstack
+  Once at 420px → unstack → stays side-by-side (need < 320px) ✓
+
+
+CONSOLE OUTPUT EXAMPLES
+------------------------
+
+Good (Stable):
+  [FlightSequencer] Serial monitor width: 350px (no change)
+  [FlightSequencer] Serial monitor width: 310px < 320px -> stacking
+  [FlightSequencer] Serial monitor width: 850px (no change - need 400px+)
+  [FlightSequencer] Serial monitor width: 420px >= 400px -> side-by-side
+
+Bad (Would be oscillation without fix):
+  [FlightSequencer] Serial monitor width: 308px -> stacking
+  [FlightSequencer] Serial monitor width: 850px -> side-by-side
+  [FlightSequencer] Serial monitor width: 308px -> stacking
+  [FlightSequencer] Serial monitor width: 850px -> side-by-side
+  ... (this was the original problem!)
+
+
+DEAD ZONE VISUALIZATION
+------------------------
+
+Width (px)
+│
+│  Unstacks here ▼
+400px ═══════════════════════════════════════════════
+│
+│        D E A D   Z O N E
+│     No transitions occur!
+│  State remains whatever it was
+│     when entering this region
+│
+320px ═══════════════════════════════════════════════
+│  Stacks here ▲
+│
+
+
+TUNING THE DEAD ZONE
+---------------------
+
+Wider dead zone (more stable, later transitions):
+  LOW:  320px (40 chars)
+  HIGH: 480px (60 chars)
+  ZONE: 160px (20 chars)  ← More hysteresis
+
+Current (balanced):
+  LOW:  320px (40 chars)
+  HIGH: 400px (50 chars)
+  ZONE: 80px (10 chars)   ← Good balance
+
+Narrower dead zone (quicker response):
+  LOW:  320px (40 chars)
+  HIGH: 360px (45 chars)
+  ZONE: 40px (5 chars)    ← Less hysteresis
+
+
+COMPARISON TABLE
+----------------
+
+│ Window Width │ Without Hysteresis │ With Hysteresis    │
+├──────────────┼────────────────────┼────────────────────┤
+│ 500px        │ Side-by-side       │ Side-by-side       │
+│ 400px        │ Side-by-side       │ Side-by-side/Stack │← Threshold HIGH
+│ 380px        │ Side-by-side       │ Previous state     │← Dead zone
+│ 350px        │ Side-by-side       │ Previous state     │← Dead zone
+│ 320px        │ Side-by-side/Stack │ Previous state     │← Threshold LOW
+│ 310px        │ Stack              │ Stack              │
+│ 200px        │ Stack              │ Stack              │
+
+Key: "Previous state" = No change, stays in current mode
+
+
+IMPLEMENTATION SUMMARY
+----------------------
+
+Location: flight_sequencer_tab.py, gps_autopilot_tab.py
+
+Variables:
+  self.serial_monitor_width_threshold_low = 320   # Stack threshold
+  self.serial_monitor_width_threshold_high = 400  # Unstack threshold
+
+Logic:
+  if currently_stacked:
+      if width >= HIGH_threshold:
+          unstack()
+  else:  # currently side-by-side
+      if width < LOW_threshold:
+          stack()
+
+Result: Stable layout at all window sizes! ✓

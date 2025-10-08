@@ -36,6 +36,9 @@ class FlightCodeManager:
         self.root.geometry("1200x800")
         self.root.minsize(400, 300)  # Allow smaller minimum size for mobile
 
+        # Configure DPI scaling for better display on high-DPI screens
+        self._configure_dpi_scaling()
+
         # Set window icon (will be set after GUI creation for better compatibility)
         self.icon_path = None
         try:
@@ -77,56 +80,65 @@ class FlightCodeManager:
 
         # Check initial layout after a brief delay to let window settle
         self.root.after(100, self._check_initial_layout)
-        
+
+    def _configure_dpi_scaling(self):
+        """Configure DPI scaling for better display on high-DPI screens."""
+        try:
+            # Get DPI from system
+            dpi = self.root.winfo_fpixels('1i')
+
+            # Calculate scaling factor (96 DPI is standard)
+            scale_factor = dpi / 96.0
+
+            # Only apply scaling if significantly different from 1.0
+            if scale_factor > 1.2 or scale_factor < 0.8:
+                # Apply Tk scaling
+                self.root.tk.call('tk', 'scaling', scale_factor)
+                print(f"[GUI] Applied DPI scaling: {scale_factor:.2f}x (DPI: {dpi:.0f})")
+            else:
+                print(f"[GUI] Standard DPI detected: {dpi:.0f}, no scaling applied")
+
+        except Exception as e:
+            print(f"[GUI] DPI scaling configuration failed: {e}")
+            # Continue without DPI scaling if detection fails
+
     def _create_widgets(self):
         """Create main GUI widgets."""
+        # Initialize status variables BEFORE creating tabs (tabs may reference them)
+        self._initialize_status_variables()
+
         # Main frame
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill='both', expand=True, padx=5, pady=5)
-        
+
         # Header frame with connection controls
         self._create_header(main_frame)
-        
+
         # Main content area with tabs
         self._create_tab_interface(main_frame)
-        
-        # Status bar
-        self._create_status_bar(main_frame)
         
     def _create_header(self, parent):
         """Create header with connection controls and status."""
         header_frame = ttk.Frame(parent)
         header_frame.pack(fill='x', pady=(0, 5))
-        
-        # Application title and version
-        title_frame = ttk.Frame(header_frame)
-        title_frame.pack(side='left')
-        
-        title_label = ttk.Label(title_frame, text="Flight Code Manager",
-                               font=('TkDefaultFont', 12, 'bold'))
-        title_label.pack(anchor='w')
 
-        version_label = ttk.Label(title_frame, text="Flight Control Software Interface v2.0",
-                                 font=('TkDefaultFont', 8))
-        version_label.pack(anchor='w')
-        
-        # Connection panel
-        conn_frame = ttk.Frame(header_frame)
-        conn_frame.pack(side='right')
-        
-        self.connection_panel = ConnectionPanel(conn_frame, self.serial_monitor, 
-                                               self._on_connection_changed)
-        self.connection_panel.pack()
-        
-        # Application detection indicator
+        # Application detection indicator (left side)
         detect_frame = ttk.Frame(header_frame)
-        detect_frame.pack(side='right', padx=10)
-        
-        ttk.Label(detect_frame, text="Detected App:").pack()
+        detect_frame.pack(side='left')
+
+        ttk.Label(detect_frame, text="Detected App:").pack(side='left')
         self.detected_app_var = tk.StringVar(value="None")
         self.detected_app_label = ttk.Label(detect_frame, textvariable=self.detected_app_var,
                                           font=('TkDefaultFont', 9, 'bold'))
-        self.detected_app_label.pack()
+        self.detected_app_label.pack(side='left', padx=(5, 0))
+
+        # Connection panel (right side)
+        conn_frame = ttk.Frame(header_frame)
+        conn_frame.pack(side='right')
+
+        self.connection_panel = ConnectionPanel(conn_frame, self.serial_monitor,
+                                               self._on_connection_changed)
+        self.connection_panel.pack()
         
     def _create_tab_interface(self, parent):
         """Create main tabbed interface."""
@@ -181,37 +193,15 @@ class FlightCodeManager:
             'index': 2
         }
         
-    def _create_status_bar(self, parent):
-        """Create status bar at bottom."""
-        status_frame = ttk.Frame(parent)
-        status_frame.pack(fill='x', pady=(5, 0))
-        
-        # Connection status
+    def _initialize_status_variables(self):
+        """Initialize status variables (no UI, just variables for tabs to reference)."""
+        # Initialize variables that tabs may reference
         self.connection_status_var = tk.StringVar(value="Disconnected")
-        ttk.Label(status_frame, textvariable=self.connection_status_var).pack(side='left')
-
-        # Message count
         self.message_count_var = tk.StringVar(value="Messages: 0")
-        ttk.Label(status_frame, textvariable=self.message_count_var).pack(side='left', padx=10)
-
-        # Flight phase status (for FlightSequencer)
         self.flight_phase_var = tk.StringVar(value="")
-        self.flight_phase_label = ttk.Label(status_frame, textvariable=self.flight_phase_var)
-        self.flight_phase_label.pack(side='left', padx=10)
-
-        # Flight timer (for FlightSequencer)
         self.flight_timer_var = tk.StringVar(value="")
-        self.flight_timer_label = ttk.Label(status_frame, textvariable=self.flight_timer_var,
-                                           font=('TkDefaultFont', 9, 'bold'))
-        self.flight_timer_label.pack(side='left', padx=5)
-
-        # Current time
         self.time_var = tk.StringVar()
-        ttk.Label(status_frame, textvariable=self.time_var).pack(side='right')
-
-        # Tab indicator
-        self.current_tab_var = tk.StringVar(value="Current: FlightSequencer")
-        ttk.Label(status_frame, textvariable=self.current_tab_var).pack(side='right', padx=10)
+        self.current_tab_var = tk.StringVar(value="")
         
     def _setup_callbacks(self):
         """Setup event callbacks.""" 
@@ -232,7 +222,6 @@ class FlightCodeManager:
         
     def _start_periodic_updates(self):
         """Start periodic update tasks."""
-        self._update_time_display()
         self._check_connection_health()
 
     def _set_window_icon(self):
@@ -251,11 +240,12 @@ class FlightCodeManager:
                 # If all else fails, continue without icon
                 pass
         
-    def _update_time_display(self):
-        """Update time display in status bar."""
-        current_time = time.strftime("%H:%M:%S")
-        self.time_var.set(current_time)
-        self.root.after(1000, self._update_time_display)
+    # Time display removed from status bar - method kept for backwards compatibility
+    # def _update_time_display(self):
+    #     """Update time display in status bar."""
+    #     current_time = time.strftime("%H:%M:%S")
+    #     self.time_var.set(current_time)
+    #     self.root.after(1000, self._update_time_display)
         
     def _check_connection_health(self):
         """Periodically check connection health."""
@@ -276,6 +266,9 @@ class FlightCodeManager:
             self.connection_status_var.set(f"Connected to {port}")
             self.detected_app_var.set("Detecting...")
 
+            # Reset tab manager detection state to allow fresh detection
+            self.tab_manager.reset_detection()
+
             # Send identification query after connection
             self.root.after(2000, self.tab_manager.send_identification_query)
         else:
@@ -284,6 +277,9 @@ class FlightCodeManager:
             self.current_app = ApplicationType.UNKNOWN
             self.message_count = 0
             self.message_count_var.set("Messages: 0")
+
+            # Reset tab manager detection state
+            self.tab_manager.reset_detection()
 
         # Notify all tabs about connection change
         for app_type, tab_info in self.tabs.items():

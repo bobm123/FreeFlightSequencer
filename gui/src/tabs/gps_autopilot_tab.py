@@ -60,6 +60,10 @@ class GpsAutopilotTab:
         self.left_frame = None
         self.right_frame = None
 
+        # Layout decision based on available space
+        self.should_stack_panels = False
+        self.min_serial_monitor_width = 40 * 8  # 320px minimum for GPS data
+
         # Create main tab frame
         self.frame = ttk.Frame(parent)
         self._create_widgets()
@@ -70,40 +74,21 @@ class GpsAutopilotTab:
         
     def _create_widgets(self):
         """Create GpsAutopilot interface widgets."""
-        self._create_responsive_layout()
+        # Configure grid layout for main frame
+        self.frame.grid_rowconfigure(0, weight=1)
+        self.frame.grid_columnconfigure(0, weight=1)
+        self.frame.grid_columnconfigure(1, weight=1)
 
-    def _create_responsive_layout(self):
-        """Create layout that can be switched between desktop and mobile modes."""
-        # Clear existing widgets
-        for widget in self.frame.winfo_children():
-            widget.destroy()
+        # Create persistent frames (never destroyed)
+        self.left_frame = ttk.Frame(self.frame)
+        self.right_frame = ttk.Frame(self.frame)
 
-        # Determine orientation based on mobile layout state
-        orient = 'vertical' if self.is_mobile_layout else 'horizontal'
-
-        # Create paned window for layout
-        self.main_paned = ttk.PanedWindow(self.frame, orient=orient)
-        self.main_paned.pack(fill='both', expand=True, padx=5, pady=5)
-
-        # Create frames
-        self.left_frame = ttk.Frame(self.main_paned)
-        self.right_frame = ttk.Frame(self.main_paned)
-
-        if self.is_mobile_layout:
-            # Mobile: Controls on top, monitor on bottom
-            self.main_paned.add(self.left_frame, weight=1)
-            self.main_paned.add(self.right_frame, weight=1)
-        else:
-            # Desktop: Controls on left, monitor on right
-            self.main_paned.add(self.left_frame, weight=1)
-            self.main_paned.add(self.right_frame, weight=1)
-
-        # Create control sections
+        # Create control sections (once, never destroyed)
         self._create_navigation_controls(self.left_frame)
         self._create_control_parameters(self.left_frame)
         self._create_flight_status(self.left_frame)
 
-        # Serial monitor
+        # Serial monitor (once, never destroyed)
         self.serial_monitor_widget = SerialMonitorWidget(
             self.right_frame,
             title="GpsAutopilot Serial Monitor",
@@ -111,6 +96,42 @@ class GpsAutopilotTab:
         )
         self.serial_monitor_widget.pack(fill='both', expand=True)
         self.serial_monitor_widget.set_send_callback(self._send_command)
+
+        # Initial layout (desktop mode by default)
+        self._update_grid_layout()
+
+        # Bind resize events to main frame
+        self.frame.bind('<Configure>', self._on_main_frame_resize)
+
+    def _update_grid_layout(self):
+        """Update grid layout based on mobile/desktop mode and available space."""
+        # Determine if we should stack based on mobile layout OR insufficient space
+        should_stack = self.is_mobile_layout or self.should_stack_panels
+
+        if should_stack:
+            # Stack vertically (controls on top, monitor on bottom)
+            self.left_frame.grid_forget()
+            self.right_frame.grid_forget()
+
+            self.frame.grid_rowconfigure(0, weight=1)
+            self.frame.grid_rowconfigure(1, weight=1)
+            self.frame.grid_columnconfigure(0, weight=1)
+            self.frame.grid_columnconfigure(1, weight=0)
+
+            self.left_frame.grid(row=0, column=0, sticky='nsew', padx=5, pady=5)
+            self.right_frame.grid(row=1, column=0, sticky='nsew', padx=5, pady=5)
+        else:
+            # Desktop: Side by side (controls on left, monitor on right)
+            self.left_frame.grid_forget()
+            self.right_frame.grid_forget()
+
+            self.frame.grid_rowconfigure(0, weight=1)
+            self.frame.grid_rowconfigure(1, weight=0)
+            self.frame.grid_columnconfigure(0, weight=1)
+            self.frame.grid_columnconfigure(1, weight=1)
+
+            self.left_frame.grid(row=0, column=0, sticky='nsew', padx=5, pady=5)
+            self.right_frame.grid(row=0, column=1, sticky='nsew', padx=5, pady=5)
         
     def _create_navigation_controls(self, parent):
         """Create navigation parameter controls."""
@@ -320,13 +341,12 @@ class GpsAutopilotTab:
         # Control buttons
         control_btn_frame = ttk.Frame(status_frame)
         control_btn_frame.pack(fill='x', padx=5, pady=5)
-        
-        self.arm_btn = ttk.Button(control_btn_frame, text="ARM", 
+
+        self.arm_btn = ttk.Button(control_btn_frame, text="ARM",
                                  command=self._toggle_arm_disarm)
         self.arm_btn.pack(side='left', padx=2)
-        
-        ttk.Button(control_btn_frame, text="EMERGENCY", 
-                  command=self._emergency_stop).pack(side='right', padx=2)
+
+        # Emergency stop removed - Arduino doesn't monitor serial in all states
                   
     def _send_command(self, command):
         """Send command to GpsAutopilot."""
@@ -465,23 +485,15 @@ class GpsAutopilotTab:
         """Toggle ARM/DISARM state."""
         current_text = self.arm_btn['text']
         if current_text == "ARM":
-            if messagebox.askyesno("ARM Autopilot", 
+            if messagebox.askyesno("ARM Autopilot",
                                   "Enable autonomous flight control?"):
                 self._send_command("CTRL ARM")
                 self.arm_btn.config(text="DISARM")
         else:
-            if messagebox.askyesno("DISARM Autopilot", 
+            if messagebox.askyesno("DISARM Autopilot",
                                   "Disable autonomous flight control?"):
                 self._send_command("CTRL DISARM")
                 self.arm_btn.config(text="ARM")
-                
-    def _emergency_stop(self):
-        """Emergency stop and disarm."""
-        if messagebox.askyesno("EMERGENCY STOP", 
-                              "Send emergency stop command?"):
-            self._send_command("SYS EMERGENCY")
-            self.arm_btn.config(text="ARM")
-            self.serial_monitor_widget.log_error("EMERGENCY STOP SENT")
             
     def handle_serial_data(self, data):
         """Handle incoming serial data for GpsAutopilot."""
@@ -676,12 +688,48 @@ class GpsAutopilotTab:
         direction = self.servo_direction_var.get()
         config_text = f"Config: Center={center}us Range={range_val}us Dir={direction}"
         self.servo_config_var.set(config_text)
-        
+
+    def _on_main_frame_resize(self, event):
+        """Handle main tab frame resize events."""
+        # Only respond to the main frame resize events
+        if event.widget == self.frame:
+            # Use a small delay to avoid excessive updates during resize
+            if hasattr(self, '_panel_resize_after_id'):
+                self.parent.after_cancel(self._panel_resize_after_id)
+            self._panel_resize_after_id = self.parent.after(150, self._check_panel_layout)
+
+    def _check_panel_layout(self):
+        """Check if window is wide enough for side-by-side layout."""
+        if not self.frame:
+            return
+
+        try:
+            frame_width = self.frame.winfo_width()
+            if frame_width <= 1:  # Not yet rendered
+                return
+
+            # Calculate if we have enough space for side-by-side:
+            # Left panel needs ~400px minimum, serial monitor needs 320px minimum
+            # Total: 720px + padding
+            min_width_for_sidebyside = 750
+
+            should_stack = frame_width < min_width_for_sidebyside
+
+            # Only update if state changed
+            if should_stack != self.should_stack_panels:
+                self.should_stack_panels = should_stack
+                mode = "stacking" if should_stack else "side-by-side"
+                print(f"[GpsAutopilot] Window width: {frame_width}px -> {mode} (min: {min_width_for_sidebyside}px)")
+                self._update_grid_layout()
+        except Exception as e:
+            print(f"[GpsAutopilot] Panel layout check error: {e}")
+            pass  # Ignore errors during widget creation/destruction
+
     def update_responsive_layout(self, is_mobile):
         """Update layout based on mobile/desktop mode."""
         if self.is_mobile_layout != is_mobile:
             self.is_mobile_layout = is_mobile
-            self._create_responsive_layout()
+            self._update_grid_layout()
 
     def get_frame(self):
         """Get the main tab frame."""

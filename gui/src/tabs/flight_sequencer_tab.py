@@ -63,6 +63,11 @@ class FlightSequencerTab:
         self.left_frame = None
         self.right_frame = None
 
+        # Layout decision based on available space for serial monitor
+        # Calculate from WINDOW width, not serial monitor width (avoids feedback loop)
+        self.should_stack_panels = False
+        self.min_serial_monitor_width = 40 * 8  # 320px minimum for GPS data
+
         # Button layout state
         self.is_narrow_layout = False
         self.narrow_width_threshold = 500  # Width threshold for button stacking
@@ -83,63 +88,26 @@ class FlightSequencerTab:
 
     def _setup_styles(self):
         """Configure custom styles for the tab."""
-        try:
-            style = ttk.Style()
-            # Create emergency button style with high contrast
-            style.configure("Emergency.TButton",
-                          background="#b71c1c",  # Much darker red for better contrast
-                          foreground="#ffffff",  # Pure white text
-                          font=('TkDefaultFont', 10, 'bold'),  # Slightly larger font
-                          relief="raised",
-                          borderwidth=2,
-                          focuscolor="none")  # Remove focus ring
-
-            # Configure hover and active states for better visibility
-            style.map("Emergency.TButton",
-                     background=[('active', '#d32f2f'),  # Lighter red on hover
-                               ('pressed', '#8b0000')],   # Dark red when pressed
-                     foreground=[('active', '#ffffff'),
-                               ('pressed', '#ffffff')])
-        except Exception:
-            # If style configuration fails, continue without custom styling
-            pass
+        # Styles removed - no custom buttons needed
+        pass
 
     def _create_widgets(self):
         """Create FlightSequencer interface widgets."""
-        self._create_responsive_layout()
+        # Configure grid layout for main frame
+        self.frame.grid_rowconfigure(0, weight=1)
+        self.frame.grid_columnconfigure(0, weight=1)
+        self.frame.grid_columnconfigure(1, weight=2)
 
-    def _create_responsive_layout(self):
-        """Create layout that can be switched between desktop and mobile modes."""
-        # Clear existing widgets
-        for widget in self.frame.winfo_children():
-            widget.destroy()
+        # Create persistent frames (never destroyed)
+        self.left_frame = ttk.Frame(self.frame)
+        self.right_frame = ttk.Frame(self.frame)
 
-        # Determine orientation based on mobile layout state
-        orient = 'vertical' if self.is_mobile_layout else 'horizontal'
-
-        # Create paned window for resizable layout
-        self.current_paned = ttk.PanedWindow(self.frame, orient=orient)
-        self.current_paned.pack(fill='both', expand=True, padx=5, pady=5)
-
-        # Create frames
-        self.left_frame = ttk.Frame(self.current_paned)
-        self.right_frame = ttk.Frame(self.current_paned)
-
-        if self.is_mobile_layout:
-            # Mobile: Controls on top, monitor on bottom
-            self.current_paned.add(self.left_frame, weight=1)
-            self.current_paned.add(self.right_frame, weight=1)
-        else:
-            # Desktop: Controls on left, monitor on right
-            self.current_paned.add(self.left_frame, weight=1)
-            self.current_paned.add(self.right_frame, weight=2)
-
-        # Create control panels in left/top frame
+        # Create control panels (once, never destroyed)
         self._create_flight_controls(self.left_frame)
         self._create_flight_data_controls(self.left_frame)
         self._create_status_display(self.left_frame)
 
-        # Serial monitor in right/bottom frame
+        # Serial monitor (once, never destroyed)
         self.serial_monitor_widget = SerialMonitorWidget(
             self.right_frame,
             title="FlightSequencer Serial Monitor",
@@ -148,11 +116,43 @@ class FlightSequencerTab:
         self.serial_monitor_widget.pack(fill='both', expand=True)
         self.serial_monitor_widget.set_send_callback(self._send_command)
 
-        # Bind frame resize events for width-based layout checking
-        if self.left_frame:
-            self.left_frame.bind('<Configure>', self._on_frame_resize)
-            # Schedule initial width check after widgets are rendered
-            self.parent.after(200, self._check_width_layout)
+        # Initial layout (desktop mode by default)
+        self._update_grid_layout()
+
+        # Bind resize events to main frame (not individual panels)
+        self.frame.bind('<Configure>', self._on_main_frame_resize)
+        self.left_frame.bind('<Configure>', self._on_frame_resize)
+        self.parent.after(200, self._check_width_layout)
+
+    def _update_grid_layout(self):
+        """Update grid layout based on mobile/desktop mode and available space."""
+        # Determine if we should stack based on mobile layout OR insufficient space
+        should_stack = self.is_mobile_layout or self.should_stack_panels
+
+        if should_stack:
+            # Stack vertically (controls on top, monitor on bottom)
+            self.left_frame.grid_forget()
+            self.right_frame.grid_forget()
+
+            self.frame.grid_rowconfigure(0, weight=1)
+            self.frame.grid_rowconfigure(1, weight=1)
+            self.frame.grid_columnconfigure(0, weight=1)
+            self.frame.grid_columnconfigure(1, weight=0)
+
+            self.left_frame.grid(row=0, column=0, sticky='nsew', padx=5, pady=5)
+            self.right_frame.grid(row=1, column=0, sticky='nsew', padx=5, pady=5)
+        else:
+            # Desktop: Side by side (controls on left, monitor on right)
+            self.left_frame.grid_forget()
+            self.right_frame.grid_forget()
+
+            self.frame.grid_rowconfigure(0, weight=1)
+            self.frame.grid_rowconfigure(1, weight=0)
+            self.frame.grid_columnconfigure(0, weight=1)
+            self.frame.grid_columnconfigure(1, weight=2)
+
+            self.left_frame.grid(row=0, column=0, sticky='nsew', padx=5, pady=5)
+            self.right_frame.grid(row=0, column=1, sticky='nsew', padx=5, pady=5)
         
     def _create_flight_controls(self, parent):
         """Create flight parameter controls."""
@@ -214,12 +214,7 @@ class FlightSequencerTab:
         dt_dwell_entry.pack(side='left', padx=5)
         ttk.Button(dt_dwell_frame, text="Set", command=self._set_dt_dwell).pack(side='left', padx=2)
 
-        # Emergency Stop button - directly below DT Dwell Time
-        emergency_frame = ttk.Frame(param_frame)
-        emergency_frame.pack(fill='x', padx=5, pady=5)
-        ttk.Button(emergency_frame, text="Emergency Stop",
-                  command=self._emergency_stop,
-                  style="Emergency.TButton").pack()
+        # Emergency Stop removed - Arduino doesn't monitor serial in all states
 
         # Action buttons frame (responsive)
         self.action_frame = ttk.Frame(param_frame)
@@ -263,34 +258,49 @@ class FlightSequencerTab:
                   command=self._download_flight_data).pack(side='left', padx=2)
         ttk.Button(download_frame, text="Clear Records",
                   command=self._clear_flight_records).pack(side='left', padx=2)
-        ttk.Button(download_frame, text="View Flight Path / Open File",
+        ttk.Button(download_frame, text="View Flight",
                   command=self._view_flight_path).pack(side='right', padx=2)
 
     def _create_status_display(self, parent):
-        """Create flight history display."""
+        """Create flight history display using grid layout."""
         history_frame = ttk.LabelFrame(parent, text="Flight History")
         history_frame.pack(fill='both', expand=True, padx=5, pady=5)
 
+        # Configure grid weights for Flight History
+        history_frame.grid_rowconfigure(0, weight=1)  # Text area (expandable)
+        history_frame.grid_rowconfigure(1, weight=0)  # Clear button (fixed)
+        history_frame.grid_columnconfigure(0, weight=1)
+
         # Create scrollable text widget for flight history
         history_container = ttk.Frame(history_frame)
-        history_container.pack(fill='both', expand=True, padx=5, pady=5)
+        history_container.grid(row=0, column=0, sticky='nsew', padx=5, pady=(5, 0))
 
-        # Text widget with scrollbar
-        self.history_text = tk.Text(history_container, height=8, wrap='word',
-                                   font=('Consolas', 9), state='disabled')
+        # Configure history container grid
+        history_container.grid_columnconfigure(0, weight=1)
+        history_container.grid_rowconfigure(0, weight=1)
 
+        # Text widget with minimum 10 lines, scrollbar always visible
+        self.history_text = tk.Text(history_container, height=10, wrap='word',
+                                   font=('Consolas', 9), state='disabled',
+                                   bg='white', relief='sunken', borderwidth=2)
+
+        # Scrollbar (always visible for consistency)
         history_scrollbar = ttk.Scrollbar(history_container, orient='vertical',
                                          command=self.history_text.yview)
         self.history_text.configure(yscrollcommand=history_scrollbar.set)
 
-        self.history_text.pack(side='left', fill='both', expand=True)
-        history_scrollbar.pack(side='right', fill='y')
+        self.history_text.grid(row=0, column=0, sticky='nsew')
+        history_scrollbar.grid(row=0, column=1, sticky='ns')
 
-        # Clear history button
+        # Clear button frame (row 1, never expands, always visible)
         clear_frame = ttk.Frame(history_frame)
-        clear_frame.pack(fill='x', padx=5, pady=5)
+        clear_frame.grid(row=1, column=0, sticky='ew', padx=5, pady=(2, 5))
 
-        ttk.Button(clear_frame, text="Clear History",
+        # Message count on left
+        if self.main_gui:
+            ttk.Label(clear_frame, textvariable=self.main_gui.message_count_var).pack(side='left')
+
+        ttk.Button(clear_frame, text="Clear",
                   command=self._clear_flight_history).pack(side='right')
             
     def _send_command(self, command):
@@ -388,14 +398,6 @@ class FlightSequencerTab:
         if messagebox.askyesno("Reset Parameters",
                               "Reset all parameters to factory defaults?"):
             self._send_command("R")
-            
-    def _emergency_stop(self):
-        """Emergency stop command."""
-        if messagebox.askyesno("Emergency Stop", 
-                              "Send emergency stop command?"):
-            self._send_command("STOP")
-            self.serial_monitor_widget.log_error("EMERGENCY STOP SENT")
-            self._add_history_entry("EMERGENCY", "Emergency stop command sent")
             
     def handle_serial_data(self, data):
         """Handle incoming serial data for FlightSequencer."""
@@ -1489,11 +1491,47 @@ class FlightSequencerTab:
                 self.parent.after_cancel(self._resize_after_id)
             self._resize_after_id = self.parent.after(150, self._check_width_layout)
 
+    def _on_main_frame_resize(self, event):
+        """Handle main tab frame resize events."""
+        # Only respond to the main frame resize events
+        if event.widget == self.frame:
+            # Use a small delay to avoid excessive updates during resize
+            if hasattr(self, '_panel_resize_after_id'):
+                self.parent.after_cancel(self._panel_resize_after_id)
+            self._panel_resize_after_id = self.parent.after(150, self._check_panel_layout)
+
+    def _check_panel_layout(self):
+        """Check if window is wide enough for side-by-side layout."""
+        if not self.frame:
+            return
+
+        try:
+            frame_width = self.frame.winfo_width()
+            if frame_width <= 1:  # Not yet rendered
+                return
+
+            # Calculate if we have enough space for side-by-side:
+            # Left panel needs ~400px minimum, serial monitor needs 320px minimum
+            # Total: 720px + padding
+            min_width_for_sidebyside = 750
+
+            should_stack = frame_width < min_width_for_sidebyside
+
+            # Only update if state changed
+            if should_stack != self.should_stack_panels:
+                self.should_stack_panels = should_stack
+                mode = "stacking" if should_stack else "side-by-side"
+                print(f"[FlightSequencer] Window width: {frame_width}px -> {mode} (min: {min_width_for_sidebyside}px)")
+                self._update_grid_layout()
+        except Exception as e:
+            print(f"[FlightSequencer] Panel layout check error: {e}")
+            pass  # Ignore errors during widget creation/destruction
+
     def update_responsive_layout(self, is_mobile):
         """Update layout based on mobile/desktop mode."""
         if self.is_mobile_layout != is_mobile:
             self.is_mobile_layout = is_mobile
-            self._create_responsive_layout()
+            self._update_grid_layout()
 
         # Schedule width check after layout is updated
         if hasattr(self, 'parent'):

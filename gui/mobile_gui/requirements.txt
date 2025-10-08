@@ -1,0 +1,11 @@
+# Kivy mobile GUI requirements
+
+# Core Kivy framework
+kivy>=2.3.0
+
+# Serial communication
+pyserial>=3.5
+
+# For Android builds (optional, used by buildozer)
+# pyjnius - automatically handled by buildozer
+# android - automatically handled by buildozer

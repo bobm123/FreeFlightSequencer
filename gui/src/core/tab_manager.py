@@ -124,3 +124,8 @@ class TabManager:
             self.active_app = app_type
             if self.detection_callback:
                 self.detection_callback(app_type)
+
+    def reset_detection(self):
+        """Reset detection state (call on connect/disconnect)."""
+        self.active_app = ApplicationType.UNKNOWN
+        self.last_detection_time = 0

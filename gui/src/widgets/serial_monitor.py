@@ -3,7 +3,7 @@ Serial Monitor Widget - Reusable serial output display widget.
 Provides consistent serial monitoring interface across tabs.
 """
 import tkinter as tk
-from tkinter import ttk, scrolledtext
+from tkinter import ttk
 import threading
 import time
 
@@ -21,47 +21,74 @@ class SerialMonitorWidget:
         self.line_count = 0
         self.send_callback = None
         
-        # Create the serial monitor frame
+        # Create the serial monitor frame with minimum height
         self.frame = ttk.LabelFrame(parent, text=title)
+        # Set minimum height to ensure command controls are always visible
+        self.frame.update_idletasks()  # Ensure frame is created
         self._create_widgets()
         
     def _create_widgets(self):
-        """Create serial monitor widgets."""
-        # Serial output display
-        self.output = scrolledtext.ScrolledText(
-            self.frame, 
-            height=20, 
-            width=60, 
+        """Create serial monitor widgets using grid for better control."""
+        # Configure frame grid weights
+        self.frame.grid_rowconfigure(0, weight=1)  # Output area (expandable)
+        self.frame.grid_rowconfigure(1, weight=0)  # Command frame (fixed)
+        self.frame.grid_rowconfigure(2, weight=0)  # Quick buttons (fixed)
+        self.frame.grid_columnconfigure(0, weight=1)
+
+        # Container for text widget and scrollbar
+        output_container = ttk.Frame(self.frame)
+        output_container.grid(row=0, column=0, sticky='nsew', padx=5, pady=(5, 0))
+
+        # Configure output container
+        output_container.grid_columnconfigure(0, weight=1)
+        output_container.grid_rowconfigure(0, weight=1)
+
+        # Serial output display (Text widget with ttk.Scrollbar)
+        # Smaller height to ensure command box fits on narrow windows
+        self.output = tk.Text(
+            output_container,
+            height=8,  # Further reduced to 8 lines minimum
+            width=60,
             state='disabled',
             wrap=tk.WORD,
-            font=('Consolas', 9)
+            font=('Consolas', 9),
+            bg='white',
+            relief='sunken',
+            borderwidth=2
         )
-        self.output.pack(fill='both', expand=True, padx=5, pady=5)
-        
+
+        # Themed scrollbar (matches Flight History style)
+        output_scrollbar = ttk.Scrollbar(output_container, orient='vertical',
+                                        command=self.output.yview)
+        self.output.configure(yscrollcommand=output_scrollbar.set)
+
+        self.output.grid(row=0, column=0, sticky='nsew')
+        output_scrollbar.grid(row=0, column=1, sticky='ns')
+
         # Configure text tags for colored output
         self.output.tag_configure("timestamp", foreground="gray")
         self.output.tag_configure("sent", foreground="blue")
-        self.output.tag_configure("received", foreground="black") 
+        self.output.tag_configure("received", foreground="black")
         self.output.tag_configure("error", foreground="red")
         self.output.tag_configure("warning", foreground="orange")
         self.output.tag_configure("success", foreground="green")
-        
+
         if self.show_command_input:
-            # Command input frame
+            # Command input frame (row 1, always visible, never expands)
             cmd_frame = ttk.Frame(self.frame)
-            cmd_frame.pack(fill='x', padx=5, pady=5)
-            
+            cmd_frame.grid(row=1, column=0, sticky='ew', padx=5, pady=(3, 1))
+
             ttk.Label(cmd_frame, text="Command:").pack(side='left')
             self.command_var = tk.StringVar()
             cmd_entry = ttk.Entry(cmd_frame, textvariable=self.command_var)
-            cmd_entry.pack(side='left', fill='x', expand=True, padx=5)
+            cmd_entry.pack(side='left', fill='x', expand=True, padx=3)
             cmd_entry.bind('<Return>', self._send_command)
-            
+
             ttk.Button(cmd_frame, text="Send", command=self._send_command).pack(side='right')
-            
-            # Quick command buttons frame
+
+            # Quick command buttons frame (row 2, always visible, never expands)
             quick_frame = ttk.Frame(self.frame)
-            quick_frame.pack(fill='x', padx=5, pady=2)
+            quick_frame.grid(row=2, column=0, sticky='ew', padx=5, pady=(1, 3))
             
             # Common commands
             ttk.Button(quick_frame, text="?", width=3, 
